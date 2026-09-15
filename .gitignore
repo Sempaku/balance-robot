@@ -1,0 +1,73 @@
+# ==========================================
+# 1. Безопасность и личные конфигурации (Wi-Fi)
+# ==========================================
+wifi_seed.json
+**/wifi_seed.json
+
+# Локальные файлы сгенерированных OTA бинарников
+*.bin
+target/ota-image.bin
+firmware/target/ota-image.bin
+
+# ==========================================
+# 2. Rust & Cargo (Прошивка)
+# ==========================================
+# Папки сборки Rust
+target/
+**/target/
+firmware/target/
+
+# Сгенерированные файлы ESP-IDF / embuild
+.embuild/
+**/.embuild/
+build/
+**/build/
+
+# Бэкапы и временные файлы cargo
+*.rs.bk
+*.orig
+
+# ==========================================
+# 3. .NET & WPF
+# ==========================================
+[Bb]in/
+[Oo]bj/
+**/[Bb]in/
+**/[Oo]bj/
+
+# CSV-логи телеметрии
+Logs/
+**/Logs/
+*.csv
+
+.vs/
+**/.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+_ReSharper*/
+*.DotSettings.user
+.idea/
+**/.idea/
+
+.vscode/
+**/.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+TestResults/
+**/TestResults/
+packages/
+**/packages/
+
+# ==========================================
+# 4. Системный мусор ОС
+# ==========================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store

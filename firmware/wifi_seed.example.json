@@ -1,0 +1,4 @@
+[
+  { "ssid": "HomeNetwork", "psk": "password123", "priority": 10 },
+  { "ssid": "Phone hotspot", "psk": "hotspot-password", "priority": 5 }
+]

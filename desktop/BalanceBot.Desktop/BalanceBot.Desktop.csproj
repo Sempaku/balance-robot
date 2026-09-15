@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UseWPF>true</UseWPF>
+		<LangVersion>latest</LangVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+		<PackageReference Include="ScottPlot.WPF" Version="5.0.55" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\BalanceBot.Core\BalanceBot.Core.csproj" />
+		<ProjectReference Include="..\BalanceBot.Protocol\BalanceBot.Protocol.csproj" />
+		<ProjectReference Include="..\BalanceBot.Transport\BalanceBot.Transport.csproj" />
+	</ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Views\" />
+    <Folder Include="Controls\" />
+  </ItemGroup>
+
+</Project>

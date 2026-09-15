@@ -1,0 +1,28 @@
+[package]
+name = "balance-robot-rust"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+
+[[bin]]
+name = "balance-robot-rust"
+harness = false
+
+[profile.release]
+opt-level = "s"
+
+[profile.dev]
+debug = true
+opt-level = "z"
+
+[dependencies]
+log = "0.4"
+esp-idf-svc = { version = "0.52.1", features = ["critical-section"] }
+anyhow = "1"
+# Команды и конфиг ходят JSON-строками: протокол читаемый и отлаживается телнетом
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[build-dependencies]
+embuild = "0.33"
+serde_json = "1"
