@@ -19,10 +19,13 @@ use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::{Output, PinDriver};
 use esp_idf_svc::hal::i2c::{I2cConfig, I2cDriver};
 use esp_idf_svc::hal::peripherals::Peripherals;
+use esp_idf_svc::hal::task::notification::Notification;
 use esp_idf_svc::hal::task::thread::ThreadSpawnConfiguration;
 use esp_idf_svc::hal::units::FromValueType;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
+use esp_idf_svc::timer::{EspTimerService, Task as TimerDispatch};
 
+use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -73,7 +76,8 @@ const ARM_FAIL_MAX_ANGLE: f32 = 15.0;
 const ARM_FAIL_MAX_GYRO: f32 = 100.0;
 const ARM_FAIL_COOLDOWN_MS: u32 = 2000; // Блокировка повторного арминга 2 сек
 
-const CONTROL_PERIOD_TICKS: u32 = 5;
+/// Период цикла управления: 5 мс = 200 Гц.
+const CONTROL_PERIOD: Duration = Duration::from_millis(5);
 
 fn main() {
     esp_idf_svc::sys::link_patches();
@@ -197,12 +201,22 @@ fn robot_main() -> anyhow::Result<()> {
     let mut ota_confirmed = false;
     let mut last_imu_time = Instant::now();
 
-    let mut last_wake = unsafe { esp_idf_svc::sys::xTaskGetTickCount() };
+    // Аппаратный такт контура управления: esp_timer с микросекундным разрешением.
+    // xTaskDelayUntil квантуется тиком FreeRTOS (1 мс) и даёт джиттер периода
+    // до целого тика; esp_timer пробуждает контур напрямую через task
+    // notification из высокоприоритетной задачи таймера.
+    // Notification привязывается к текущей задаче — создаётся здесь, в контуре.
+    let tick = Arc::new(Notification::new());
+    let tick_notifier = tick.notifier();
+    let timer_service = EspTimerService::<TimerDispatch>::new()?;
+    let tick_timer = timer_service.timer(move || {
+        let _ = unsafe { tick_notifier.notify(NonZeroU32::new(1).unwrap()) };
+    })?;
+    tick_timer.every(CONTROL_PERIOD)?;
+    log::info!("Контур: такт от esp_timer каждые 5 мс (разрешение 1 мкс)");
 
     loop {
-        unsafe {
-            esp_idf_svc::sys::xTaskDelayUntil(&mut last_wake, CONTROL_PERIOD_TICKS);
-        }
+        tick.wait_any();
 
         let now = Instant::now();
         let raw_dt = now.duration_since(last_imu_time).as_secs_f32();
