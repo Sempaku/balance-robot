@@ -177,6 +177,7 @@ impl BalanceController {
         trim_offset: f32,
         max_drive_lean_deg: f32,
         max_turn_rate: f32,
+        drive_expo: f32,
         dt: f32,
     ) -> (f32, f32) {
         if !dt.is_finite() || dt <= 0.0 {
@@ -188,6 +189,16 @@ impl BalanceController {
 
         let wheel_rate_logical = wheel_rate * MOTOR_SIGN;
         let is_driving = drive_forward.abs() > 0.03;
+
+        // Экспоненциальная кривая газа: sign(x) * |x|^expo
+        let drive_forward = if is_driving && drive_expo > 0.0 {
+            let expo = drive_expo.clamp(0.0, 0.8);
+            let sign = drive_forward.signum();
+            let abs = drive_forward.abs();
+            sign * abs.powf(1.0 - expo)
+        } else {
+            drive_forward
+        };
 
         let g = &self.gains;
 

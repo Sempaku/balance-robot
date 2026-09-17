@@ -308,6 +308,7 @@ fn robot_main() -> anyhow::Result<()> {
                             tunables.trim_offset,
                             tunables.max_drive_lean,
                             tunables.max_turn_rate,
+                            tunables.drive_expo,
                             dt,
                         );
                         ctrl.adapt_trim(dt);
