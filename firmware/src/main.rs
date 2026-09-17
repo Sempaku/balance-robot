@@ -22,6 +22,8 @@ use esp_idf_svc::hal::task::thread::ThreadSpawnConfiguration;
 use esp_idf_svc::hal::units::FromValueType;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
 
+use esp_idf_svc::sys::esp_task_wdt_add;
+
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -47,6 +49,9 @@ const OTA_CONFIRM_AFTER: Duration = Duration::from_secs(30);
 const MOTOR_TEST_ON_BOOT: bool = false;
 
 const CONTROL_PERIOD_TICKS: u32 = 5;
+
+/// Период сброса watchdog в главном цикле (мс)
+const WDT_FEED_PERIOD_MS: u32 = 500;
 
 fn main() {
     esp_idf_svc::sys::link_patches();
@@ -80,6 +85,12 @@ fn robot_main() -> anyhow::Result<()> {
     log::info!(" ROBOT BALANCER — cascaded PD");
     log::info!(" MOTOR_SIGN={MOTOR_SIGN}  микрошаг 1/{MICROSTEPS}");
     log::info!("=========================================");
+
+    // Watchdog: перезагрузка при зависании > 3 сек
+    unsafe {
+        esp_task_wdt_add(std::ptr::null_mut());
+    }
+    log::info!("Watchdog: инициализирован (timeout 3с)");
 
     let peripherals = Peripherals::take()?;
     let sysloop = EspSystemEventLoop::take()?;
@@ -161,6 +172,7 @@ fn robot_main() -> anyhow::Result<()> {
     let boot = Instant::now();
     let mut ota_confirmed = false;
     let mut last_imu_time = Instant::now();
+    let mut last_wdt_feed = Instant::now();
 
     let mut last_wake = unsafe { esp_idf_svc::sys::xTaskGetTickCount() };
 
@@ -186,6 +198,14 @@ fn robot_main() -> anyhow::Result<()> {
         if !ota_confirmed && boot.elapsed() > OTA_CONFIRM_AFTER {
             ota_confirmed = true;
             net::ota::confirm_running_image();
+        }
+
+        // Watchdog: кормим каждые 500 мс
+        if last_wdt_feed.elapsed() > Duration::from_millis(500) {
+            unsafe {
+                esp_idf_svc::sys::esp_task_wdt_reset();
+            }
+            last_wdt_feed = Instant::now();
         }
 
         match imu.read() {
