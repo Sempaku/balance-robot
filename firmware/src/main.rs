@@ -38,9 +38,10 @@ use telemetry::{BlackBoxFrame, Telemetry, EV_ARMED, EV_FALL, EV_IMU_DEAD, STATE_
 
 const TELEMETRY_PERIOD: Duration = Duration::from_millis(200);
 
-const ARM_MAX_GYRO_DPS: f32 = 8.0;
-const ARM_MAX_RATE: f32 = 40.0;
-const ARM_STABLE_CYCLES: u32 = 100;
+// Реалистичные пороги для удержания робота руками человека
+const ARM_MAX_GYRO_DPS: f32 = 16.0;  // Тремор рук обычно 8-12°/с
+const ARM_MAX_RATE: f32 = 60.0;
+const ARM_STABLE_CYCLES: u32 = 60;   // 60 × 5 мс = 300 мс неподвижности (вместо 500 мс)
 const MAX_IMU_ERRORS: u32 = 3;
 const OTA_CONFIRM_AFTER: Duration = Duration::from_secs(30);
 const MOTOR_TEST_ON_BOOT: bool = false;
@@ -147,16 +148,14 @@ fn robot_main() -> anyhow::Result<()> {
     filter.reset(initial_accel_angle);
 
     log::info!("Начальный угол IMU: {initial_accel_angle:.2}°");
-    log::info!("1) ПОКАЧАЙ робота ~2 с — проверю знак гироскопа.");
-    log::info!(
-        "2) Держи почти вертикально (|A|<{:.0}°) ~0.5 с до LED, потом ОТПУСТИ.",
-        tunables.arm_max_angle
-    );
+    log::info!("Держи робота примерно вертикально (|A|<{:.0}°), синий LED включит баланс.", tunables.arm_max_angle);
 
     let mut is_balancing = false;
     let mut imu_errors = 0u32;
     let mut arm_stable = 0u32;
     let mut trim_sum = 0.0f32;
+    let mut resync_stable = 0u32;
+    let mut arm_requested_until: Option<Instant> = None;
     let mut last_steps = engine.steps();
 
     let boot = Instant::now();
@@ -194,39 +193,51 @@ fn robot_main() -> anyhow::Result<()> {
                 imu_errors = 0;
                 tele.set_imu_errors(0);
 
-                let angle = filter.update(
-                    data.accel_angle_deg,
-                    data.gyro_rate_dps,
-                    data.accel_magnitude_g,
-                    dt,
-                );
                 let gyro = data.gyro_rate_dps;
                 let wheel_rate = engine.actual_rate();
+                // Оценку дрейфа гироскопа обновляем только в покое: под
+                // разгоном акселерометр принимает ускорение за наклон.
+                let bias_adapt = wheel_rate.abs() < 200.0;
+
+                let angle = filter.update(
+                    data.accel_angle_deg,
+                    gyro,
+                    data.accel_magnitude_g,
+                    dt,
+                    bias_adapt,
+                );
                 let steps_now = engine.steps();
                 let steps_delta = steps_now.wrapping_sub(last_steps);
                 last_steps = steps_now;
 
                 tele.update_imu(angle, gyro, data.accel_magnitude_g, data.accel_angle_deg);
                 tele.set_gyro_bias(filter.bias());
-                // В телеметрию выводится итоговая эффективная точка равновесия
                 tele.set_trim(ctrl.effective_trim());
 
                 let stop_requested = remote.take_disarm();
                 let (drive_fwd, drive_trn) = remote.get_drive();
 
                 if is_balancing {
-                    let err = angle - ctrl.effective_trim();
-                    let falling = err.abs() > tunables.fall_angle_deg
-                        || (err.abs() > 10.0 && gyro.abs() > tunables.fall_gyro_dps);
+                    // Ошибка слежения с учетом наклона хода (устраняет ложное падение)
+                    let tracking_err = ctrl.tracking_error(angle);
+                    
+                    let falling = tracking_err.abs() > tunables.fall_angle_deg
+                        || angle.abs() > 35.0
+                        || (tracking_err.abs() > 12.0 && gyro.abs() > tunables.fall_gyro_dps);
 
                     if falling || stop_requested {
                         if stop_requested {
                             log::warn!("СТОП по команде из UI");
                         } else {
-                            log::warn!("УПАЛ e={err:.1}° A={angle:.1}° G={gyro:.0} — СТОП");
+                            log::warn!("УПАЛ e={tracking_err:.1}° A={angle:.1}° G={gyro:.0} — СТОП");
                         }
-                        tele.send_event(EV_FALL, err);
+                        tele.send_event(EV_FALL, tracking_err);
                         tele.freeze_blackbox();
+
+                        // Сбрасываем фильтр угла и дрейф нуля, чтобы не копить ошибку на полу
+                        filter.reset(data.accel_angle_deg);
+                        filter.reset_bias();
+
                         disarm(
                             &mut is_balancing,
                             &mut ctrl,
@@ -258,7 +269,8 @@ fn robot_main() -> anyhow::Result<()> {
                         );
 
                         let (p, lean, d, base_cmd) = ctrl.last_terms();
-                        tele.update_control(base_cmd, wheel_rate, p, lean, d, steps_now);
+                        let i = ctrl.last_integral();
+                        tele.update_control(base_cmd, wheel_rate, p, i, d, steps_now);
                         tele.set_state(STATE_BALANCING);
 
                         tele.record_blackbox(BlackBoxFrame {
@@ -294,10 +306,11 @@ fn robot_main() -> anyhow::Result<()> {
                         }
                     }
 
+                    // Реалистичный диапазон гравитации для удержания руками: 0.75g .. 1.25g
                     let still = angle.abs() < tunables.arm_max_angle
                         && gyro.abs() < ARM_MAX_GYRO_DPS
                         && wheel_rate.abs() < ARM_MAX_RATE
-                        && (0.90..=1.10).contains(&data.accel_magnitude_g);
+                        && (0.75..=1.25).contains(&data.accel_magnitude_g);
 
                     if still {
                         arm_stable = arm_stable.saturating_add(1);
@@ -307,7 +320,9 @@ fn robot_main() -> anyhow::Result<()> {
                         trim_sum = 0.0;
                     }
 
-                    if remote.take_arm() && arm_stable > 0 {
+                    // Если нажата кнопка в UI "ВКЛЮЧИТЬ БАЛАНС" — армим мгновенно при вертикальном положении
+                    let remote_arm = remote.take_arm();
+                    if remote_arm && angle.abs() < tunables.arm_max_angle {
                         arm_stable = ARM_STABLE_CYCLES;
                         trim_sum = angle * ARM_STABLE_CYCLES as f32;
                     }
@@ -316,6 +331,7 @@ fn robot_main() -> anyhow::Result<()> {
                         let held = trim_sum / ARM_STABLE_CYCLES as f32;
                         let trim = ctrl.arm(held);
                         filter.reset(angle);
+                        filter.reset_bias();
                         last_steps = engine.steps();
                         engine.stop();
                         is_balancing = true;
@@ -326,13 +342,7 @@ fn robot_main() -> anyhow::Result<()> {
                         tele.send_event(EV_ARMED, trim);
                         tele.reset_blackbox();
 
-                        if (trim - held).abs() > 0.05 {
-                            log::info!(
-                                "БАЛАНС ВКЛ trim={trim:.2}° (в руках {held:.2}°) — ОТПУСКАЙ РУКИ"
-                            );
-                        } else {
-                            log::info!("БАЛАНС ВКЛ trim={trim:.2}° — ОТПУСКАЙ РУКИ");
-                        }
+                        log::info!("БАЛАНС ВКЛ trim={trim:.2}° — ОТПУСКАЙ РУКИ");
                     }
                 }
 

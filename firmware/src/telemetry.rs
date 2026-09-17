@@ -14,7 +14,6 @@ pub const EV_NONE: u8 = 0;
 pub const EV_ARMED: u8 = 1;
 pub const EV_FALL: u8 = 2;
 pub const EV_IMU_DEAD: u8 = 3;
-pub const EV_BAD_DT: u8 = 4;
 
 const LOGGER_STACK: u32 = 4096;
 const LOGGER_PRIORITY: u32 = 2;
@@ -262,10 +261,6 @@ impl Telemetry {
     }
 
     pub fn spawn_logger(self: &Arc<Self>, period: Duration) -> anyhow::Result<()> {
-        struct LoggerCtx {
-            tele: Arc<Telemetry>,
-            period: Duration,
-        }
         let ctx = Box::into_raw(Box::new(LoggerCtx {
             tele: self.clone(),
             period,
@@ -292,11 +287,15 @@ impl Telemetry {
     }
 }
 
+/// Контекст задачи логгера: уходит в FreeRTOS как сырой указатель и
+/// восстанавливается в `logger_entry`. Объявлен один раз, чтобы layout
+/// не разъехался между созданием и чтением.
+struct LoggerCtx {
+    tele: Arc<Telemetry>,
+    period: Duration,
+}
+
 unsafe extern "C" fn logger_entry(ctx: *mut core::ffi::c_void) {
-    struct LoggerCtx {
-        tele: Arc<Telemetry>,
-        period: Duration,
-    }
     let ctx = unsafe { Box::from_raw(ctx as *mut LoggerCtx) };
     let tele = ctx.tele;
     let period_ms = ctx.period.as_millis() as u32;
@@ -345,7 +344,6 @@ unsafe extern "C" fn logger_entry(ctx: *mut core::ffi::c_void) {
                 EV_ARMED => log::info!(">>> БАЛАНС ВКЛ (угол {:+.2}°)", raw),
                 EV_FALL => log::warn!(">>> ПАДЕНИЕ (угол {:+.2}°) — чёрный ящик сохранён", raw),
                 EV_IMU_DEAD => log::error!(">>> MPU6050 НЕ ОТВЕЧАЕТ — СТОП"),
-                EV_BAD_DT => log::warn!(">>> СКАЧОК dt до {:.2} мс — АВАРИЙНЫЙ СТОП", raw),
                 _ => {}
             }
         }

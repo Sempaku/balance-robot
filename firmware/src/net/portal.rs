@@ -174,7 +174,10 @@ fn parse_network(body: &str) -> Option<WifiNetwork> {
     let mut psk = String::new();
 
     for pair in body.split('&') {
-        let (key, value) = pair.split_once('=')?;
+        // Пара без '=' — мусор в теле запроса: пропускаем её, а не весь разбор.
+        let Some((key, value)) = pair.split_once('=') else {
+            continue;
+        };
         match key {
             "ssid" => ssid = url_decode(value),
             "psk" => psk = url_decode(value),

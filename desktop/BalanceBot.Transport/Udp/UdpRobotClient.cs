@@ -74,6 +74,7 @@ public sealed class UdpRobotClient : IAsyncDisposable
     {
         byte[] receiveBuffer = new byte[256];
         uint lastSequence = 0;
+        bool hasLastSequence = false;
 
         while (!_cts.Token.IsCancellationRequested)
         {
@@ -86,11 +87,14 @@ public sealed class UdpRobotClient : IAsyncDisposable
                     TotalPacketsReceived++;
                     LastPacketReceivedAt = DateTime.UtcNow;
 
-                    if (lastSequence != 0 && packet.Sequence > lastSequence + 1)
+                    // Переполнение uint обрабатывается самой арифметикой:
+                    // разность считается по модулю 2^32.
+                    if (hasLastSequence && packet.Sequence != lastSequence + 1)
                     {
-                        PacketsLost += (packet.Sequence - lastSequence - 1);
+                        PacketsLost += packet.Sequence - (lastSequence + 1);
                     }
                     lastSequence = packet.Sequence;
+                    hasLastSequence = true;
 
                     _telemetryChannel.Writer.TryWrite(packet);
                 }

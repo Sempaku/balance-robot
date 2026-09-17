@@ -88,7 +88,12 @@ fn run(
             match portal::run(&mut wifi, &storage, &status) {
                 // Портал сохранил новую сеть — пробуем её без перезагрузки.
                 Ok(()) => failures = 0,
-                Err(e) => log::error!("Портал: {e:#}"),
+                Err(e) => {
+                    // Пауза обязательна: без неё цикл «скан → портал → ошибка»
+                    // крутится вхолостую и заливает лог.
+                    log::error!("Портал: {e:#}, повтор через 5 с");
+                    std::thread::sleep(Duration::from_secs(5));
+                }
             }
             status.set(LinkState::Down);
         }

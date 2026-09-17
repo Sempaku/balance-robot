@@ -13,7 +13,7 @@ using ScottPlot.Plottables;
 
 namespace BalanceBot.Desktop.ViewModels;
 
-public sealed partial class DashboardViewModel : ObservableObject
+public sealed partial class DashboardViewModel : ObservableObject, IDisposable
 {
     private readonly TelemetryHub _telemetryHub;
     private readonly ParameterManager _paramManager;
@@ -272,5 +272,14 @@ public sealed partial class DashboardViewModel : ObservableObject
             FileName = dir,
             UseShellExecute = true
         });
+    }
+
+    /// <summary>
+    /// Останавливает таймер отрисовки, чтобы VM не жила вечно после отключения.
+    /// </summary>
+    public void Dispose()
+    {
+        _renderTimer.Stop();
+        _renderTimer.Tick -= OnRenderTick;
     }
 }

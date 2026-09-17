@@ -170,14 +170,6 @@ impl StepperEngine {
         let r = f32::from_bits(self.actual_right.load(Ordering::Relaxed));
         (l + r) * 0.5
     }
-
-    pub fn actual_left_rate(&self) -> f32 {
-        f32::from_bits(self.actual_left.load(Ordering::Relaxed))
-    }
-
-    pub fn actual_right_rate(&self) -> f32 {
-        f32::from_bits(self.actual_right.load(Ordering::Relaxed))
-    }
 }
 
 unsafe extern "C" fn stepper_entry(ctx: *mut core::ffi::c_void) {

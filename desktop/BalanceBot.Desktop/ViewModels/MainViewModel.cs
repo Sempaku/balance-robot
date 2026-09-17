@@ -12,6 +12,7 @@ namespace BalanceBot.Desktop.ViewModels;
 public sealed partial class MainViewModel : ObservableObject
 {
     private CancellationTokenSource? _connectCts;
+    private bool _connectCancelled;
 
     [ObservableProperty] private string _manualIp = "192.168.4.1";
     [ObservableProperty] private bool _isScanning;
@@ -96,6 +97,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         IsConnecting = true;
         ConnectionStatus = $"Подключение к {ip}...";
+        _connectCancelled = false;
 
         _connectCts?.Dispose();
         _connectCts = new CancellationTokenSource(TimeSpan.FromSeconds(3.5));
@@ -104,6 +106,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             if (CurrentSession != null)
             {
+                Dashboard?.Dispose();
                 await CurrentSession.DisposeAsync();
             }
 
@@ -122,7 +125,7 @@ public sealed partial class MainViewModel : ObservableObject
         catch (OperationCanceledException)
         {
             IsConnected = false;
-            ConnectionStatus = _connectCts.IsCancellationRequested && !_connectCts.Token.IsCancellationRequested
+            ConnectionStatus = _connectCancelled
                 ? "Подключение отменено"
                 : $"Таймаут: {ip} не отвечает (проверь IP или Wi-Fi)";
         }
@@ -154,6 +157,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (IsConnecting)
         {
+            _connectCancelled = true;
             _connectCts?.Cancel();
             ConnectionStatus = "Подключение отменено";
             IsConnecting = false;
@@ -164,6 +168,7 @@ public sealed partial class MainViewModel : ObservableObject
     public async Task DisconnectAsync()
     {
         Control?.Dispose();
+        Dashboard?.Dispose();
 
         if (CurrentSession != null)
         {
