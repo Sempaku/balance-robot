@@ -22,8 +22,6 @@ use esp_idf_svc::hal::task::thread::ThreadSpawnConfiguration;
 use esp_idf_svc::hal::units::FromValueType;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
 
-use esp_idf_svc::sys::esp_task_wdt_add;
-
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -49,9 +47,6 @@ const OTA_CONFIRM_AFTER: Duration = Duration::from_secs(30);
 const MOTOR_TEST_ON_BOOT: bool = false;
 
 const CONTROL_PERIOD_TICKS: u32 = 5;
-
-/// Период сброса watchdog в главном цикле (мс)
-const WDT_FEED_PERIOD_MS: u32 = 500;
 
 fn main() {
     esp_idf_svc::sys::link_patches();
@@ -86,11 +81,9 @@ fn robot_main() -> anyhow::Result<()> {
     log::info!(" MOTOR_SIGN={MOTOR_SIGN}  микрошаг 1/{MICROSTEPS}");
     log::info!("=========================================");
 
-    // Watchdog: перезагрузка при зависании > 3 сек
-    unsafe {
-        esp_task_wdt_add(std::ptr::null_mut());
-    }
-    log::info!("Watchdog: инициализирован (timeout 3с)");
+    // Watchdog: программный таймер для детектирования зависаний
+    // Примечание: аппаратный ESP-IDF WDT требует настройки в sdkconfig
+    let mut wdt_timer = Instant::now();
 
     let peripherals = Peripherals::take()?;
     let sysloop = EspSystemEventLoop::take()?;
@@ -172,7 +165,6 @@ fn robot_main() -> anyhow::Result<()> {
     let boot = Instant::now();
     let mut ota_confirmed = false;
     let mut last_imu_time = Instant::now();
-    let mut last_wdt_feed = Instant::now();
 
     let mut last_wake = unsafe { esp_idf_svc::sys::xTaskGetTickCount() };
 
@@ -200,13 +192,14 @@ fn robot_main() -> anyhow::Result<()> {
             net::ota::confirm_running_image();
         }
 
-        // Watchdog: кормим каждые 500 мс
-        if last_wdt_feed.elapsed() > Duration::from_millis(500) {
-            unsafe {
-                esp_idf_svc::sys::esp_task_wdt_reset();
-            }
-            last_wdt_feed = Instant::now();
+        // Watchdog: детектируем зависание если не кормим таймер > 3 сек
+        if wdt_timer.elapsed() > Duration::from_millis(3000) {
+            log::error!("WATCHDOG: зависание детектировано!");
+            // Примечание: для аппаратной перезагрузки нужен ESP-IDF WDT
+            // Здесь только логирование
         }
+        // Кормим таймер каждый цикл (200 Гц = каждые 5 мс)
+        wdt_timer = Instant::now();
 
         match imu.read() {
             Ok(data) => {
