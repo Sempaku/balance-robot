@@ -1,13 +1,27 @@
-//! Комплементарный фильтр угла с онлайн-оценкой дрейфа гироскопа.
+//! Комплементарный фильтр угла с онлайн-оценкой дрейфа гироскопа
+//! и адаптацией к вибрациям шаговых двигателей.
 
 const MAX_CORRECTION_DEG: f32 = 8.0;
 const MAX_BIAS_DPS: f32 = 15.0;
 const BIAS_GAIN: f32 = 0.2;
 
+/// Базовый порог вибрации (в покое)
+const VIBRATION_BASE_THRESHOLD: f32 = 0.08;
+/// Верхний порог вибрации для полного отключения коррекции
+const VIBRATION_MAX_THRESHOLD: f32 = 0.40;
+/// Скорость адаптации порога вибрации (1/с)
+const VIBRATION_ADAPT_RATE: f32 = 2.0;
+/// Минимальный вес коррекции (никогда не отключаем полностью)
+const MIN_CORRECTION_WEIGHT: f32 = 0.1;
+/// Постоянная времени сглаживания веса (с)
+const WEIGHT_FILTER_TAU: f32 = 0.2;
+
 pub struct ComplementaryFilter {
     angle: f32,
     bias: f32,
     kp: f32,
+    vibration_level: f32,
+    correction_weight: f32,
 }
 
 impl ComplementaryFilter {
@@ -17,11 +31,15 @@ impl ComplementaryFilter {
             angle: 0.0,
             bias: 0.0,
             kp: 1.0 / tau,
+            vibration_level: 0.0,
+            correction_weight: 1.0,
         }
     }
 
     pub fn reset(&mut self, angle: f32) {
         self.angle = if angle.is_finite() { angle } else { 0.0 };
+        self.vibration_level = 0.0;
+        self.correction_weight = 1.0;
     }
 
     /// Сброс накопленного дрейфа нуля гироскопа (вызывается при падении/арминге)
@@ -39,10 +57,26 @@ impl ComplementaryFilter {
         self.bias
     }
 
+    /// Текущий уровень вибрации (0.0 = нет вибрации, >0.4 = сильная)
+    pub fn vibration_level(&self) -> f32 {
+        self.vibration_level
+    }
+
+    /// Текущий вес коррекции акселерометром (0.0..1.0)
+    pub fn correction_weight(&self) -> f32 {
+        self.correction_weight
+    }
+
     /// `bias_adapt` — можно ли сейчас обновлять оценку дрейфа гироскопа.
     /// Во время разгона/торможения акселерометр «видит» ускорение как наклон,
     /// и оценка дрейфа на таких данных уползает: после поездки угол начинает
     /// плыть. Поэтому дрейф дооцениваем только когда колёса почти стоят.
+    /// 
+    /// Адаптация к вибрациям:
+    /// - Оцениваем текущий уровень вибрации по отклонению accel_magnitude от 1g
+    /// - Сглаживаем оценку экспоненциальным фильтром
+    /// - Уменьшаем вес коррекции при высокой вибрации
+    /// - Динамически подстраиваем порог срабатывания фильтра
     pub fn update(
         &mut self,
         accel_angle: f32,
@@ -60,23 +94,39 @@ impl ComplementaryFilter {
 
         self.angle += (gyro_rate - self.bias) * dt;
 
-        let deviation = (accel_magnitude_g - 1.0).abs();
-        let weight = if deviation <= 0.08 {
+        // Оценка текущего уровня вибрации
+        let vibration = (accel_magnitude_g - 1.0).abs();
+        
+        // Экспоненциальное сглаживание уровня вибрации
+        let alpha = (VIBRATION_ADAPT_RATE * dt).min(0.5);
+        self.vibration_level += (vibration - self.vibration_level) * alpha;
+
+        // Адаптивный порог: базовый + доля от текущего уровня вибрации
+        let adaptive_threshold = VIBRATION_BASE_THRESHOLD + 0.3 * self.vibration_level;
+
+        // Вычисление веса коррекции (плавная функция)
+        let raw_weight = if self.vibration_level <= adaptive_threshold {
             1.0
-        } else if deviation < 0.40 {
-            (0.40 - deviation) / 0.32
+        } else if self.vibration_level < VIBRATION_MAX_THRESHOLD {
+            ((VIBRATION_MAX_THRESHOLD - self.vibration_level) 
+                / (VIBRATION_MAX_THRESHOLD - adaptive_threshold)).max(MIN_CORRECTION_WEIGHT)
         } else {
-            0.0
+            MIN_CORRECTION_WEIGHT
         };
 
-        if weight > 0.0 {
+        // Low-pass фильтр веса для плавности
+        let target_weight = raw_weight;
+        let filter_alpha = (dt / WEIGHT_FILTER_TAU).min(0.5);
+        self.correction_weight += (target_weight - self.correction_weight) * filter_alpha;
+
+        if self.correction_weight > 0.0 {
             let error = (accel_angle - self.angle).clamp(-MAX_CORRECTION_DEG, MAX_CORRECTION_DEG);
-            self.angle += self.kp * weight * error * dt;
+            self.angle += self.kp * self.correction_weight * error * dt;
 
             // ВАЖНО: Адаптируем дрейф нуля ТОЛЬКО около вертикали (< 15°)
             // и только в покое. Когда робот лежит на полу или едет, дрейф не копится!
-            if bias_adapt && self.angle.abs() < 15.0 {
-                self.bias = (self.bias - BIAS_GAIN * weight * error * dt)
+            if bias_adapt && self.angle.abs() < 15.0 && self.correction_weight > 0.5 {
+                self.bias = (self.bias - BIAS_GAIN * self.correction_weight * error * dt)
                     .clamp(-MAX_BIAS_DPS, MAX_BIAS_DPS);
             }
         }
