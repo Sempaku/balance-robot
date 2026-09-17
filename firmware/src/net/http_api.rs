@@ -13,7 +13,7 @@ use std::time::Duration;
 use serde_json::json;
 
 use super::NetStatus;
-use crate::params::{ParamStore, CATALOG};
+use crate::params::ParamStore;
 use crate::telemetry::Telemetry;
 
 pub const HTTP_PORT: u16 = 80;

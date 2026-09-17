@@ -51,3 +51,13 @@ public record BlackBoxResponse(
     [property: JsonPropertyName("ok")] bool Ok,
     [property: JsonPropertyName("frames")] List<BlackBoxFrameDto> Frames
 );
+
+public record AutotuneStatus(
+    [property: JsonPropertyName("ok")] bool Ok,
+    [property: JsonPropertyName("state")] string State,
+    [property: JsonPropertyName("ka")] float Ka,
+    [property: JsonPropertyName("kd")] float Kd,
+    [property: JsonPropertyName("ki")] float Ki,
+    [property: JsonPropertyName("ku")] float Ku,
+    [property: JsonPropertyName("tu")] float Tu
+);

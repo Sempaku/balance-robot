@@ -96,6 +96,7 @@ impl<'d> Mpu6050<'d> {
         self.gyro_sign = -self.gyro_sign;
     }
 
+    #[allow(dead_code)]
     pub fn set_offset(&mut self, offset: f32) {
         self.gyro_offset = offset;
     }

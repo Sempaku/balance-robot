@@ -24,6 +24,7 @@ use esp_idf_svc::sys::{uart_driver_install, uart_read_bytes, ESP_OK};
 use crate::params::{ParamStore, CATALOG};
 use crate::storage::Storage;
 use crate::request_gyro_calibration;
+use crate::request_autotune;
 
 const UART_NUM: u32 = 0;
 const RX_BUFFER: i32 = 512;
@@ -127,6 +128,12 @@ fn handle(console: &Console, line: &str) {
             // Запрос калибровки гироскопа (обработка в main loop)
             request_gyro_calibration();
             log::warn!("TUNE: запрос калибровки гироскопа отправлен");
+            return;
+        }
+        "autotune" | "tune" => {
+            // Запрос автонастройки PID
+            request_autotune();
+            log::warn!("TUNE: запущена автонастройка PID — ДЕРЖИ РОБОТА ВЕРТИКАЛЬНО!");
             return;
         }
         "help" | "h" | "?" => {

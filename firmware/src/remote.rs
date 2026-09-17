@@ -4,14 +4,28 @@
 //! задача, поэтому сеть не вызывает контроллер напрямую, а поднимает флаг.
 //! Контур забирает его в своём темпе и сам решает, можно ли выполнить.
 
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, Ordering};
 
 /// Таймаут watchdog для команд движения (300 мс).
 pub const DRIVE_WATCHDOG_MS: u32 = 300;
 
+/// Состояния автонастройки PID (для опроса по сети).
+pub const AUTOTUNE_IDLE: u8 = 0;
+pub const AUTOTUNE_RUNNING: u8 = 1;
+pub const AUTOTUNE_DONE: u8 = 2;
+pub const AUTOTUNE_FAILED: u8 = 3;
+
 pub struct RemoteState {
     arm: AtomicBool,
     disarm: AtomicBool,
+    autotune_request: AtomicBool,
+    autotune_state: AtomicU8,
+    // Результат автонастройки: f32, упакованные в AtomicU32 через to_bits
+    autotune_ka: AtomicU32,
+    autotune_kd: AtomicU32,
+    autotune_ki: AtomicU32,
+    autotune_ku: AtomicU32,
+    autotune_tu: AtomicU32,
     // f32 в диапазоне -1.0..1.0, масштабированный в i32 (× 10 000)
     drive_forward: AtomicI32,
     drive_turn: AtomicI32,
@@ -23,6 +37,13 @@ impl Default for RemoteState {
         Self {
             arm: AtomicBool::new(false),
             disarm: AtomicBool::new(false),
+            autotune_request: AtomicBool::new(false),
+            autotune_state: AtomicU8::new(AUTOTUNE_IDLE),
+            autotune_ka: AtomicU32::new(0),
+            autotune_kd: AtomicU32::new(0),
+            autotune_ki: AtomicU32::new(0),
+            autotune_ku: AtomicU32::new(0),
+            autotune_tu: AtomicU32::new(0),
             drive_forward: AtomicI32::new(0),
             drive_turn: AtomicI32::new(0),
             last_drive_ms: AtomicU32::new(0),
@@ -50,6 +71,45 @@ impl RemoteState {
 
     pub fn take_disarm(&self) -> bool {
         self.disarm.swap(false, Ordering::AcqRel)
+    }
+
+    /// Запрос автонастройки PID (вызывается из сетевой задачи).
+    pub fn request_autotune(&self) {
+        self.autotune_request.store(true, Ordering::Release);
+    }
+
+    /// Забрать запрос автонастройки (вызывается из контура 200 Гц).
+    pub fn take_autotune(&self) -> bool {
+        self.autotune_request.swap(false, Ordering::AcqRel)
+    }
+
+    /// Публикация состояния автонастройки для опроса по сети.
+    pub fn set_autotune_state(&self, state: u8) {
+        self.autotune_state.store(state, Ordering::Release);
+    }
+
+    /// Публикация результата автонастройки (вызывается из контура).
+    pub fn set_autotune_result(&self, ka: f32, kd: f32, ki: f32, ku: f32, tu: f32) {
+        self.autotune_ka.store(ka.to_bits(), Ordering::Release);
+        self.autotune_kd.store(kd.to_bits(), Ordering::Release);
+        self.autotune_ki.store(ki.to_bits(), Ordering::Release);
+        self.autotune_ku.store(ku.to_bits(), Ordering::Release);
+        self.autotune_tu.store(tu.to_bits(), Ordering::Release);
+    }
+
+    pub fn autotune_state(&self) -> u8 {
+        self.autotune_state.load(Ordering::Acquire)
+    }
+
+    /// Результат автонастройки: (ka, kd, ki, ku, tu).
+    pub fn autotune_result(&self) -> (f32, f32, f32, f32, f32) {
+        (
+            f32::from_bits(self.autotune_ka.load(Ordering::Acquire)),
+            f32::from_bits(self.autotune_kd.load(Ordering::Acquire)),
+            f32::from_bits(self.autotune_ki.load(Ordering::Acquire)),
+            f32::from_bits(self.autotune_ku.load(Ordering::Acquire)),
+            f32::from_bits(self.autotune_tu.load(Ordering::Acquire)),
+        )
     }
 
     /// Запись команды движения (вызывается из UDP-потока на ядре 0).

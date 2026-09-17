@@ -1,7 +1,8 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
+using BalanceBot.Core.Analysis;
 using BalanceBot.Desktop.ViewModels;
 using BalanceBot.Protocol.Dtos;
 using ScottPlot;
@@ -28,6 +29,7 @@ public partial class MainWindow : Window
     {
         SetupPlots();
         SetupBlackBoxPlotTheme();
+        SetupBodePlotsTheme();
     }
 
     private void SetupPlots()
@@ -124,6 +126,12 @@ public partial class MainWindow : Window
             {
                 _vm.BlackBox.OnFramesLoaded = RenderBlackBoxFrames;
             }
+
+            if (args.PropertyName == nameof(_vm.Bode) && _vm.Bode != null)
+            {
+                _vm.Bode.OnStepResponse = RenderBodeStepResponse;
+                _vm.Bode.OnAnalysisComplete = RenderBodeResult;
+            }
         };
 
         PlotOrientation.Refresh();
@@ -137,6 +145,8 @@ public partial class MainWindow : Window
         plot.DataBackground.Color = Color.FromHex("#1B1F28");
         plot.Axes.Color(Color.FromHex("#8B93A7"));
         plot.Grid.MajorLineColor = Color.FromHex("#222733");
+        // Легенда добавляется один раз: ShowLegend(Edge) создает новую панель при каждом вызове
+        plot.ShowLegend(Edge.Top);
         PlotBlackBox.Refresh();
     }
 
@@ -161,8 +171,109 @@ public partial class MainWindow : Window
         cmdScatter.LegendText = "Команда мотора (об/с)";
 
         plot.Axes.AutoScale();
-        plot.ShowLegend(Edge.Top);
         PlotBlackBox.Refresh();
+    }
+
+    private void SetupBodePlotsTheme()
+    {
+        foreach (var wpfPlot in new[] { PlotStepResponse, PlotBodeMag, PlotBodePhase })
+        {
+            var plot = wpfPlot.Plot;
+            plot.FigureBackground.Color = Color.FromHex("#12141A");
+            plot.DataBackground.Color = Color.FromHex("#1B1F28");
+            plot.Axes.Color(Color.FromHex("#8B93A7"));
+            plot.Grid.MajorLineColor = Color.FromHex("#222733");
+            wpfPlot.Refresh();
+        }
+
+        PlotStepResponse.Plot.Axes.Title.Label.Text = "Отклик на импульс трима";
+        PlotStepResponse.Plot.Axes.Title.Label.FontSize = 13;
+
+        PlotBodeMag.Plot.Axes.Title.Label.Text = "АЧХ контура |L| (дБ), ось X — log10(f/Гц)";
+        PlotBodeMag.Plot.Axes.Title.Label.FontSize = 13;
+
+        PlotBodePhase.Plot.Axes.Title.Label.Text = "ФЧХ контура ∠L (°), ось X — log10(f/Гц)";
+        PlotBodePhase.Plot.Axes.Title.Label.FontSize = 13;
+
+        // Легенды добавляются один раз: ShowLegend(Edge) создает новую панель при каждом вызове
+        PlotStepResponse.Plot.ShowLegend(Edge.Top);
+        PlotBodeMag.Plot.ShowLegend(Edge.Top);
+        PlotBodePhase.Plot.ShowLegend(Edge.Top);
+    }
+
+    private void RenderBodeStepResponse(double[] time, double[] trim, double[] angle)
+    {
+        var plot = PlotStepResponse.Plot;
+        plot.Clear();
+
+        var trimScatter = plot.Add.Scatter(time, trim, Color.FromHex("#FFB300"));
+        trimScatter.LegendText = "Трим (°)";
+        trimScatter.MarkerSize = 0;
+
+        var angleScatter = plot.Add.Scatter(time, angle, Color.FromHex("#3D7EFF"));
+        angleScatter.LegendText = "Угол (°)";
+        angleScatter.MarkerSize = 0;
+
+        plot.Axes.AutoScale();
+        PlotStepResponse.Refresh();
+    }
+
+    private void RenderBodeResult(BodeResult result)
+    {
+        // Ось X в логарифмическом масштабе через log10(f): ScottPlot 5.0 не имеет встроенной лог-оси
+        double[] logFreqs = result.Loop.Select(p => Math.Log10(p.FreqHz)).ToArray();
+        double[] logClosedFreqs = result.ClosedLoop.Select(p => Math.Log10(p.FreqHz)).ToArray();
+        double[] loopMag = result.Loop.Select(p => p.MagDb).ToArray();
+        double[] loopPhase = result.Loop.Select(p => p.PhaseDeg).ToArray();
+        double[] closedMag = result.ClosedLoop.Select(p => p.MagDb).ToArray();
+
+        double xMin = Math.Log10(BodeAnalyzer.MinFreqHz) - 0.1;
+        double xMax = Math.Log10(Math.Max(10.0, result.SampleRateHz / 2.0)) + 0.1;
+
+        // --- АЧХ ---
+        var magPlot = PlotBodeMag.Plot;
+        magPlot.Clear();
+
+        var loopMagScatter = magPlot.Add.Scatter(logFreqs, loopMag, Color.FromHex("#3D7EFF"));
+        loopMagScatter.LegendText = "Контур L";
+        loopMagScatter.MarkerSize = 0;
+        loopMagScatter.LineWidth = 2;
+
+        var closedMagScatter = magPlot.Add.Scatter(logClosedFreqs, closedMag, Color.FromHex("#78909C"));
+        closedMagScatter.LegendText = "Замкнутая T";
+        closedMagScatter.MarkerSize = 0;
+        closedMagScatter.LinePattern = LinePattern.Dashed;
+
+        magPlot.Add.HorizontalLine(0, 1, Color.FromHex("#39445C"), LinePattern.Solid);
+
+        if (result.GainCrossoverHz.HasValue)
+        {
+            magPlot.Add.VerticalLine(Math.Log10(result.GainCrossoverHz.Value), 1, Color.FromHex("#00E676"), LinePattern.Dashed);
+        }
+
+        magPlot.Axes.SetLimitsX(xMin, xMax);
+        magPlot.Axes.AutoScaleY();
+        PlotBodeMag.Refresh();
+
+        // --- ФЧХ ---
+        var phasePlot = PlotBodePhase.Plot;
+        phasePlot.Clear();
+
+        var loopPhaseScatter = phasePlot.Add.Scatter(logFreqs, loopPhase, Color.FromHex("#00E676"));
+        loopPhaseScatter.LegendText = "Фаза L";
+        loopPhaseScatter.MarkerSize = 0;
+        loopPhaseScatter.LineWidth = 2;
+
+        phasePlot.Add.HorizontalLine(-180, 1, Color.FromHex("#39445C"), LinePattern.Solid);
+
+        if (result.PhaseCrossoverHz.HasValue)
+        {
+            phasePlot.Add.VerticalLine(Math.Log10(result.PhaseCrossoverHz.Value), 1, Color.FromHex("#FF4081"), LinePattern.Dashed);
+        }
+
+        phasePlot.Axes.SetLimitsX(xMin, xMax);
+        phasePlot.Axes.AutoScaleY();
+        PlotBodePhase.Refresh();
     }
 
     private void OnWindowKeyDown(object sender, KeyEventArgs e)

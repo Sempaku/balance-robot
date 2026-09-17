@@ -26,6 +26,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private ControlViewModel? _control;
     [ObservableProperty] private WifiViewModel? _wifi;
     [ObservableProperty] private BlackBoxViewModel? _blackBox;
+    [ObservableProperty] private BodeViewModel? _bode;
 
     public bool CanConnect => !IsConnected && !IsConnecting;
     public bool CanEditInputs => !IsConnected && !IsConnecting;
@@ -114,10 +115,11 @@ public sealed partial class MainViewModel : ObservableObject
             CurrentSession = await RobotSession.ConnectAsync(info, _connectCts.Token);
 
             Dashboard = new DashboardViewModel(CurrentSession.Telemetry, CurrentSession.Parameters);
-            Tuning = new TuningViewModel(CurrentSession.Parameters);
+            Tuning = new TuningViewModel(CurrentSession);
             Control = new ControlViewModel(CurrentSession);
             Wifi = new WifiViewModel(CurrentSession);
             BlackBox = new BlackBoxViewModel(CurrentSession);
+            Bode = new BodeViewModel(CurrentSession);
 
             IsConnected = true;
             ConnectionStatus = $"Подключено к {name} ({ip})";
@@ -182,6 +184,7 @@ public sealed partial class MainViewModel : ObservableObject
         Control = null;
         Wifi = null;
         BlackBox = null;
+        Bode = null;
         ConnectionStatus = "Отключено";
     }
 

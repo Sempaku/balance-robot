@@ -58,11 +58,13 @@ impl ComplementaryFilter {
     }
 
     /// Текущий уровень вибрации (0.0 = нет вибрации, >0.4 = сильная)
+    #[allow(dead_code)]
     pub fn vibration_level(&self) -> f32 {
         self.vibration_level
     }
 
     /// Текущий вес коррекции акселерометром (0.0..1.0)
+    #[allow(dead_code)]
     pub fn correction_weight(&self) -> f32 {
         self.correction_weight
     }

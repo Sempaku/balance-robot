@@ -218,6 +218,26 @@ public sealed class TcpCommandClient : IAsyncDisposable
         return doc.RootElement.TryGetProperty("ok", out var okProp) && okProp.GetBoolean();
     }
 
+    /// <summary>
+    /// Запуск автонастройки PID на роботе (релейный тест Зиглера-Николса).
+    /// Робот должен быть выключен из баланса и удерживаться вертикально.
+    /// </summary>
+    public async Task<bool> StartAutotuneAsync(CancellationToken ct = default)
+    {
+        string res = await SendRawCommandAsync(new { cmd = "autotune" }, ct);
+        using var doc = JsonDocument.Parse(res);
+        return doc.RootElement.TryGetProperty("ok", out var okProp) && okProp.GetBoolean();
+    }
+
+    /// <summary>
+    /// Текущий статус автонастройки: idle / running / done / failed + результат.
+    /// </summary>
+    public async Task<AutotuneStatus?> GetAutotuneStatusAsync(CancellationToken ct = default)
+    {
+        string res = await SendRawCommandAsync(new { cmd = "autotune_status" }, ct);
+        return JsonSerializer.Deserialize<AutotuneStatus>(res);
+    }
+
     public async Task<WifiListResponse?> GetWifiNetworksAsync(CancellationToken ct = default)
     {
         string res = await SendRawCommandAsync(new { cmd = "get_wifi" }, ct);

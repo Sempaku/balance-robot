@@ -11,6 +11,7 @@ mod stepper;
 mod storage;
 mod telemetry;
 mod tuning;
+mod autotune;
 
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::cpu::Core;
@@ -35,6 +36,14 @@ pub fn request_gyro_calibration() {
     CALIBRATE_REQUEST.store(true, Ordering::Relaxed);
 }
 
+// Глобальный флаг запроса автонастройки PID
+static AUTOTUNE_REQUEST: AtomicBool = AtomicBool::new(false);
+
+/// Запросить автонастройку PID.
+pub fn request_autotune() {
+    AUTOTUNE_REQUEST.store(true, Ordering::Relaxed);
+}
+
 use control::{BalanceController, MOTOR_SIGN};
 use filter::ComplementaryFilter;
 use mpu6050::{Mpu6050, CALIBRATION_MAX_SPREAD_DPS};
@@ -45,6 +54,7 @@ use signcheck::GyroSignCheck;
 use stepper::{StepperEngine, StepperMotor, MAX_STEP_RATE, MICROSTEPS};
 use storage::Storage;
 use telemetry::{BlackBoxFrame, Telemetry, EV_ARMED, EV_FALL, EV_IMU_DEAD, STATE_BALANCING, STATE_IDLE};
+use autotune::RelayTuner;
 
 const TELEMETRY_PERIOD: Duration = Duration::from_millis(200);
 
@@ -160,6 +170,8 @@ fn robot_main() -> anyhow::Result<()> {
     let mut sign_check = GyroSignCheck::new();
     let mut led = PinDriver::output(peripherals.pins.gpio2)?;
     led.set_low()?;
+    
+    let mut autotuner = RelayTuner::new();
 
     if MOTOR_TEST_ON_BOOT {
         motor_direction_test(&engine);
@@ -175,8 +187,6 @@ fn robot_main() -> anyhow::Result<()> {
     let mut imu_errors = 0u32;
     let mut arm_stable = 0u32;
     let mut trim_sum = 0.0f32;
-    let mut resync_stable = 0u32;
-    let mut arm_requested_until: Option<Instant> = None;
     let mut last_steps = engine.steps();
 
     // Защита от убегания: таймер и флаг неудачного арминга
@@ -229,6 +239,15 @@ fn robot_main() -> anyhow::Result<()> {
 
                 let gyro = data.gyro_rate_dps;
                 let wheel_rate = engine.actual_rate();
+
+                // Обработка запроса автонастройки: из UART или из сети (кнопка в UI)
+                let tune_requested =
+                    AUTOTUNE_REQUEST.swap(false, Ordering::Relaxed) | remote.take_autotune();
+                if tune_requested && !is_balancing {
+                    log::info!("AUTOTUNE: запуск... ДЕРЖИ РОБОТА ВЕРТИКАЛЬНО!");
+                    remote.set_autotune_state(remote::AUTOTUNE_RUNNING);
+                    autotuner.start();
+                }
                 
                 // Обработка запроса калибровки гироскопа
                 if CALIBRATE_REQUEST.swap(false, Ordering::Relaxed) {
@@ -263,6 +282,45 @@ fn robot_main() -> anyhow::Result<()> {
                     dt,
                     bias_adapt,
                 );
+
+                // Автонастройка PID: релейный тест на фильтрованном угле.
+                // Состояния Complete/Failed проверяются по state(), а не по
+                // возвращаемому значению update() — в них update() отдает None.
+                let relay_cmd = autotuner.update(angle, gyro, is_balancing, dt);
+                match autotuner.state() {
+                    autotune::TuneState::Oscillating => {
+                        if let Some(cmd) = relay_cmd {
+                            tele.update_imu(angle, gyro, data.accel_magnitude_g, data.accel_angle_deg);
+                            engine.set_rates(cmd, cmd);
+                            continue;
+                        }
+                    }
+                    autotune::TuneState::Complete => {
+                        if let Some(result) = autotuner.get_result() {
+                            params.set("ka", result.ka);
+                            params.set("kd", result.kd);
+                            if result.ki > 0.0 {
+                                params.set("ki", result.ki);
+                            }
+                            remote.set_autotune_result(
+                                result.ka, result.kd, result.ki, result.ku, result.tu,
+                            );
+                            log::warn!(
+                                "AUTOTUNE: применены Ka={:.0}, Kd={:.0}, Ki={:.1} (Ku={:.0}, Tu={:.3}с) — проверь робота!",
+                                result.ka, result.kd, result.ki, result.ku, result.tu
+                            );
+                        }
+                        remote.set_autotune_state(remote::AUTOTUNE_DONE);
+                        autotuner.reset();
+                    }
+                    autotune::TuneState::Failed => {
+                        log::error!("AUTOTUNE: не удалось (таймаут)");
+                        remote.set_autotune_state(remote::AUTOTUNE_FAILED);
+                        autotuner.reset();
+                    }
+                    _ => {}
+                }
+
                 let steps_now = engine.steps();
                 let steps_delta = steps_now.wrapping_sub(last_steps);
                 last_steps = steps_now;
@@ -352,13 +410,13 @@ fn robot_main() -> anyhow::Result<()> {
                             cmd_right.clamp(-limit, limit),
                         );
 
-                        let (p, lean, d, base_cmd) = ctrl.last_terms();
+                        let (p, _lean, d, base_cmd) = ctrl.last_terms();
                         let i = ctrl.last_integral();
                         tele.update_control(base_cmd, wheel_rate, p, i, d, steps_now);
                         tele.set_state(STATE_BALANCING);
 
                         // Флаги состояния: бит 0 = баланс, бит 1 = препятствие
-                        let mut flags = if is_balancing { 1u8 } else { 0u8 };
+                        let flags = if is_balancing { 1u8 } else { 0u8 };
                         
                         tele.record_blackbox(BlackBoxFrame {
                             t_ms: uptime_ms,

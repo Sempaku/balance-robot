@@ -137,6 +137,11 @@ fn dispatch(command: &str, request: &Value, services: &Services) -> anyhow::Resu
             services.remote.request_disarm();
             Ok(json!({}))
         }
+        "autotune" => {
+            services.remote.request_autotune();
+            Ok(json!({}))
+        }
+        "autotune_status" => Ok(autotune_status_json(services)),
         "get_blackbox" => Ok(json!({ "frames": services.telemetry.get_blackbox_json() })),
         "clear_blackbox" => {
             services.telemetry.reset_blackbox();
@@ -145,6 +150,28 @@ fn dispatch(command: &str, request: &Value, services: &Services) -> anyhow::Resu
         "reboot" => Ok(json!({})),
         other => anyhow::bail!("неизвестная команда `{other}`"),
     }
+}
+
+fn autotune_status_json(services: &Services) -> Value {
+    use crate::remote::{AUTOTUNE_DONE, AUTOTUNE_FAILED, AUTOTUNE_IDLE, AUTOTUNE_RUNNING};
+
+    let state = match services.remote.autotune_state() {
+        AUTOTUNE_IDLE => "idle",
+        AUTOTUNE_RUNNING => "running",
+        AUTOTUNE_DONE => "done",
+        AUTOTUNE_FAILED => "failed",
+        _ => "unknown",
+    };
+
+    let (ka, kd, ki, ku, tu) = services.remote.autotune_result();
+    json!({
+        "state": state,
+        "ka": ka,
+        "kd": kd,
+        "ki": ki,
+        "ku": ku,
+        "tu": tu,
+    })
 }
 
 fn info(services: &Services) -> Value {
