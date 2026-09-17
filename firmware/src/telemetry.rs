@@ -30,6 +30,10 @@ pub struct BlackBoxFrame {
     pub wheel_rate: f32,
     pub steps: i32,
     pub dt_us: u16,
+    pub pid_ka: f32,
+    pub pid_kd: f32,
+    pub pid_ki: f32,
+    pub flags: u8,
 }
 
 struct BlackBox {

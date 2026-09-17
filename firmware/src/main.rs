@@ -357,6 +357,9 @@ fn robot_main() -> anyhow::Result<()> {
                         tele.update_control(base_cmd, wheel_rate, p, i, d, steps_now);
                         tele.set_state(STATE_BALANCING);
 
+                        // Флаги состояния: бит 0 = баланс, бит 1 = препятствие
+                        let mut flags = if is_balancing { 1u8 } else { 0u8 };
+                        
                         tele.record_blackbox(BlackBoxFrame {
                             t_ms: uptime_ms,
                             angle,
@@ -365,6 +368,10 @@ fn robot_main() -> anyhow::Result<()> {
                             wheel_rate,
                             steps: steps_now,
                             dt_us: (raw_dt * 1_000_000.0) as u16,
+                            pid_ka: tunables.ka_angle,
+                            pid_kd: tunables.kd_gyro,
+                            pid_ki: tunables.ki_angle,
+                            flags,
                         });
                     }
                 } else {
