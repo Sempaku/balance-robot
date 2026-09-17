@@ -25,6 +25,14 @@ const MAX_CRUISE_SPEED: f32 = 4800.0;
 /// за ~0.8 с; при этом контр скорости выходит на предельный наклон хода.
 const TARGET_SLEW_RATE: f32 = 6000.0;
 
+/// Скорость нарастания ускорения для S-образного профиля (шаг/с³).
+/// Определяет плавность перехода от разгона к постоянной скорости.
+/// Меньше значение = более плавный S-образный профиль.
+const S_CURVE_JERK: f32 = 15000.0;
+
+/// Коэффициент формы S-кривой. 1.0 = линейный профиль, >1.0 = более выраженный S.
+const S_CURVE_SHAPE: f32 = 1.5;
+
 /// Недобор скорости до цели (шаг/с), после которого включается дожим
 /// препятствий. Выше типичного недобора при разгоне (~3000 шаг/с при
 /// полном темпе нарастания), чтобы дожим срабатывал только на реальном
@@ -65,8 +73,10 @@ pub struct BalanceController {
     last_trim_offset: f32,
     lean_from_position: f32,
     obstacle_boost: f32,
-    /// Текущая цель контура скорости (шаг/с), наращивается плавно (TARGET_SLEW_RATE).
+    /// Текущая цель контура скорости (шаг/с), наращивается плавно.
     target_velocity: f32,
+    /// Целевое ускорение для S-профиля (шаг/с²)
+    target_accel: f32,
     position: f32,
     speed: f32,
     soft_gain: f32,
@@ -88,6 +98,7 @@ impl BalanceController {
             lean_from_position: 0.0,
             obstacle_boost: 0.0,
             target_velocity: 0.0,
+            target_accel: 0.0,
             position: 0.0,
             speed: 0.0,
             soft_gain: 0.0,
@@ -110,6 +121,7 @@ impl BalanceController {
         self.lean_from_position = 0.0;
         self.obstacle_boost = 0.0;
         self.target_velocity = 0.0;
+        self.target_accel = 0.0;
         self.position = 0.0;
         self.speed = 0.0;
         self.soft_gain = SOFT_GAIN_START;
@@ -125,6 +137,7 @@ impl BalanceController {
     pub fn disarm(&mut self) {
         self.soft_gain = 0.0;
         self.target_velocity = 0.0;
+        self.target_accel = 0.0;
         self.position = 0.0;
         self.speed = 0.0;
         self.last_cmd = 0.0;
@@ -178,7 +191,7 @@ impl BalanceController {
 
         let g = &self.gains;
 
-        // === Единый контур скорости (разгон, торможение и стоянка) ===
+        // === Единый контур скорости с S-образным профилем ===
         //
         // 1. Цель: вперёд = положительная скорость колёс (та же конвенция,
         //    что в motor_direction_test: фаза «+» = движение вперёд).
@@ -188,11 +201,31 @@ impl BalanceController {
             0.0
         };
 
-        // 2. Цель меняется плавно: ограничение ускорения убирает скачок
-        //    заданного угла при каждом нажатии/отпускании клавиши.
-        let max_target_step = TARGET_SLEW_RATE * dt;
-        self.target_velocity +=
-            (commanded_velocity - self.target_velocity).clamp(-max_target_step, max_target_step);
+        // 2. S-образный профиль разгона/торможения через управление ускорением.
+        //    Используем сигмоидальную функцию для плавного изменения ускорения.
+        let velocity_error = commanded_velocity - self.target_velocity;
+        let error_abs = velocity_error.abs();
+        
+        // Целевое ускорение с S-профилем: чем больше ошибка, тем больше ускорение,
+        // но с плавным насыщением по сигмоиде.
+        let target_accel_mag = if error_abs < 10.0 {
+            // Малая ошибка: линейный режим
+            error_abs * TARGET_SLEW_RATE / 1000.0
+        } else {
+            // Большая ошибка: S-образное насыщение
+            let normalized_error = error_abs / 1000.0;
+            let sigmoid = (S_CURVE_SHAPE * normalized_error).tanh();
+            sigmoid * TARGET_SLEW_RATE
+        };
+        
+        // Плавное изменение ускорения (jerk limit)
+        let accel_dt = (target_accel_mag - self.target_accel.abs()) * S_CURVE_JERK * dt;
+        self.target_accel += accel_dt.signum() * accel_dt.abs().min(S_CURVE_JERK * dt);
+        self.target_accel = self.target_accel.clamp(-TARGET_SLEW_RATE, TARGET_SLEW_RATE);
+        
+        // Интегрируем ускорение в скорость
+        let max_velocity_step = self.target_accel * dt;
+        self.target_velocity += velocity_error.signum() * max_velocity_step.min(velocity_error.abs());
 
         // 3. Наклон в сторону недобора скорости: колёса медленнее цели —
         //    наклоняемся вперёд к цели, колёса быстрее — отклоняемся назад.
