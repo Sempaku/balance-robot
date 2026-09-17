@@ -46,6 +46,13 @@ const MAX_IMU_ERRORS: u32 = 3;
 const OTA_CONFIRM_AFTER: Duration = Duration::from_secs(30);
 const MOTOR_TEST_ON_BOOT: bool = false;
 
+/// Защита от убегания при арминге: если через 200 мс после включения баланса
+/// угол > 15° ИЛИ гироскоп > 100°/с — аварийный стоп.
+const ARM_FAIL_CHECK_MS: u32 = 200;
+const ARM_FAIL_MAX_ANGLE: f32 = 15.0;
+const ARM_FAIL_MAX_GYRO: f32 = 100.0;
+const ARM_FAIL_COOLDOWN_MS: u32 = 2000; // Блокировка повторного арминга 2 сек
+
 const CONTROL_PERIOD_TICKS: u32 = 5;
 
 fn main() {
@@ -162,6 +169,10 @@ fn robot_main() -> anyhow::Result<()> {
     let mut arm_requested_until: Option<Instant> = None;
     let mut last_steps = engine.steps();
 
+    // Защита от убегания: таймер и флаг неудачного арминга
+    let mut arm_fail_timer: Option<Instant> = None;
+    let mut arm_fail_cooldown_until: Option<Instant> = None;
+
     let boot = Instant::now();
     let mut ota_confirmed = false;
     let mut last_imu_time = Instant::now();
@@ -231,6 +242,32 @@ fn robot_main() -> anyhow::Result<()> {
                 let (drive_fwd, drive_trn) = remote.get_drive();
 
                 if is_balancing {
+                    // Проверка на убегание после арминга (первые 200 мс)
+                    if let Some(arm_timer) = arm_fail_timer {
+                        if arm_timer.elapsed() < Duration::from_millis(ARM_FAIL_CHECK_MS as u64) {
+                            // Ещё в окне проверки
+                            if angle.abs() > ARM_FAIL_MAX_ANGLE || gyro.abs() > ARM_FAIL_MAX_GYRO {
+                                log::warn!("УБЕГАНИЕ при арминге: A={angle:.1}° G={gyro:.0} — СТОП");
+                                tele.send_event(4, angle); // EV_ARM_FAIL
+                                arm_fail_cooldown_until = Some(Instant::now() + Duration::from_millis(ARM_FAIL_COOLDOWN_MS as u64));
+                                arm_fail_timer = None;
+                                disarm(
+                                    &mut is_balancing,
+                                    &mut ctrl,
+                                    &engine,
+                                    &mut led,
+                                    &tele,
+                                    &mut arm_stable,
+                                    &mut trim_sum,
+                                )?;
+                                continue;
+                            }
+                        } else {
+                            // Окно проверки прошло успешно
+                            arm_fail_timer = None;
+                        }
+                    }
+
                     // Ошибка слежения с учетом наклона хода (устраняет ложное падение)
                     let tracking_err = ctrl.tracking_error(angle);
                     
@@ -335,12 +372,19 @@ fn robot_main() -> anyhow::Result<()> {
 
                     // Если нажата кнопка в UI "ВКЛЮЧИТЬ БАЛАНС" — армим мгновенно при вертикальном положении
                     let remote_arm = remote.take_arm();
-                    if remote_arm && angle.abs() < tunables.arm_max_angle {
+                    
+                    // Проверка cooldown после неудачного арминга
+                    let cooldown_active = arm_fail_cooldown_until
+                        .map(|t| Instant::now() < t)
+                        .unwrap_or(false);
+                    
+                    if remote_arm && !cooldown_active && angle.abs() < tunables.arm_max_angle {
                         arm_stable = ARM_STABLE_CYCLES;
                         trim_sum = angle * ARM_STABLE_CYCLES as f32;
+                        arm_fail_timer = Some(Instant::now());
                     }
 
-                    if arm_stable >= ARM_STABLE_CYCLES {
+                    if arm_stable >= ARM_STABLE_CYCLES && arm_fail_timer.is_some() {
                         let held = trim_sum / ARM_STABLE_CYCLES as f32;
                         let trim = ctrl.arm(held);
                         filter.reset(angle);
