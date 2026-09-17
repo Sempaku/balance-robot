@@ -12,6 +12,7 @@
 //! show        показать текущие значения
 //! save        записать в NVS, чтобы пережили перезагрузку
 //! reset       вернуть зашитые значения
+//! cal         калибровка гироскопа на ходу (робот должен стоять)
 //! ```
 //!
 //! Полный список ключей — в `params.rs`; здесь принимается любой из них.
@@ -22,6 +23,7 @@ use esp_idf_svc::sys::{uart_driver_install, uart_read_bytes, ESP_OK};
 
 use crate::params::{ParamStore, CATALOG};
 use crate::storage::Storage;
+use crate::request_gyro_calibration;
 
 const UART_NUM: u32 = 0;
 const RX_BUFFER: i32 = 512;
@@ -119,6 +121,12 @@ fn handle(console: &Console, line: &str) {
             console.params.reset();
             log::warn!("TUNE: возвращены зашитые значения (не сохранены)");
             print_all(&console.params);
+            return;
+        }
+        "calibrate" | "cal" => {
+            // Запрос калибровки гироскопа (обработка в main loop)
+            request_gyro_calibration();
+            log::warn!("TUNE: запрос калибровки гироскопа отправлен");
             return;
         }
         "help" | "h" | "?" => {

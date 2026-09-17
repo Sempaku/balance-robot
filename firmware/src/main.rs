@@ -23,11 +23,21 @@ use esp_idf_svc::hal::units::FromValueType;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
+
+// Глобальный флаг запроса калибровки гироскопа
+static CALIBRATE_REQUEST: AtomicBool = AtomicBool::new(false);
+
+/// Запросить калибровку гироскопа на ходу.
+/// Вызывается из UART-консоли или других задач.
+pub fn request_gyro_calibration() {
+    CALIBRATE_REQUEST.store(true, Ordering::Relaxed);
+}
 
 use control::{BalanceController, MOTOR_SIGN};
 use filter::ComplementaryFilter;
-use mpu6050::Mpu6050;
+use mpu6050::{Mpu6050, CALIBRATION_MAX_SPREAD_DPS};
 use net::{NetStatus, PORT_COMMAND, PORT_TELEMETRY};
 use params::{ParamStore, Params};
 use remote::RemoteState;
@@ -219,6 +229,29 @@ fn robot_main() -> anyhow::Result<()> {
 
                 let gyro = data.gyro_rate_dps;
                 let wheel_rate = engine.actual_rate();
+                
+                // Обработка запроса калибровки гироскопа
+                if CALIBRATE_REQUEST.swap(false, Ordering::Relaxed) {
+                    if wheel_rate.abs() < 50.0 && gyro.abs() < 20.0 {
+                        log::info!("Калибровка гироскопа на ходу — НЕ ДВИГАЙ РОБОТА ~1 с");
+                        match imu.calibrate_with_result() {
+                            Ok(spread) if spread <= CALIBRATION_MAX_SPREAD_DPS => {
+                                log::info!("Калибровка успешна: offset={:+.3} °/с, spread={:.2} °/с", 
+                                    imu.offset(), spread);
+                            }
+                            Ok(spread) => {
+                                log::warn!("Калибровка шумная: spread={:.2} °/с (порог {:.2})", 
+                                    spread, CALIBRATION_MAX_SPREAD_DPS);
+                            }
+                            Err(e) => {
+                                log::error!("Ошибка калибровки: {e:?}");
+                            }
+                        }
+                    } else {
+                        log::warn!("Калибровка отклонена: робот движется (rate={wheel_rate:.0} °/с)");
+                    }
+                }
+                
                 // Оценку дрейфа гироскопа обновляем только в покое: под
                 // разгоном акселерометр принимает ускорение за наклон.
                 let bias_adapt = wheel_rate.abs() < 200.0;

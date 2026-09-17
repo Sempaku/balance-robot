@@ -16,7 +16,7 @@ const REG_WHO_AM_I: u8 = 0x75;
 const I2C_TIMEOUT_MS: u32 = 10;
 const CALIBRATION_SAMPLES: usize = 200;
 /// Если разброс гироскопа при калибровке больше — робота трогали
-const CALIBRATION_MAX_SPREAD_DPS: f32 = 3.0;
+pub const CALIBRATION_MAX_SPREAD_DPS: f32 = 3.0;
 const CALIBRATION_ATTEMPTS: u32 = 3;
 
 /// Наклон меряем по оси X акселерометра (вращение вокруг Y, гироскоп `gy`).
@@ -96,7 +96,22 @@ impl<'d> Mpu6050<'d> {
         self.gyro_sign = -self.gyro_sign;
     }
 
+    pub fn set_offset(&mut self, offset: f32) {
+        self.gyro_offset = offset;
+    }
+
+    pub fn offset(&self) -> f32 {
+        self.gyro_offset
+    }
+
     fn calibrate(&mut self) -> Result<(), EspError> {
+        self.calibrate_with_result()
+            .map(|_| ())
+    }
+
+    /// Калибровка гироскопа с возвратом результата (разброс).
+    /// Возвращает Ok(spread) при успехе или Err при ошибке.
+    pub fn calibrate_with_result(&mut self) -> Result<f32, EspError> {
         for attempt in 1..=CALIBRATION_ATTEMPTS {
             log::info!("Калибровка гироскопа ({attempt}) — НЕ ДВИГАЙ РОБОТА ~1 с");
 
@@ -122,13 +137,13 @@ impl<'d> Mpu6050<'d> {
             );
 
             if spread <= CALIBRATION_MAX_SPREAD_DPS {
-                return Ok(());
+                return Ok(spread);
             }
             log::warn!("Робота двигали при калибровке — повтор");
         }
 
         log::warn!("Калибровка шумная, берём последнее значение offset");
-        Ok(())
+        Ok(f32::MAX) // Возвращаем максимальный разброс при неудаче
     }
 
     pub fn read_raw(&mut self) -> Result<(f32, f32, f32, f32, f32, f32), EspError> {
