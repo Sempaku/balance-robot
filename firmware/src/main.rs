@@ -38,7 +38,7 @@ pub fn request_gyro_calibration() {
 use control::{BalanceController, MOTOR_SIGN};
 use filter::ComplementaryFilter;
 use mpu6050::{Mpu6050, CALIBRATION_MAX_SPREAD_DPS};
-use net::{NetStatus, PORT_COMMAND, PORT_TELEMETRY};
+use net::{NetStatus, PORT_COMMAND, PORT_TELEMETRY, http_api::HTTP_PORT};
 use params::{ParamStore, Params};
 use remote::RemoteState;
 use signcheck::GyroSignCheck;
@@ -505,7 +505,11 @@ fn start_network(
         log::error!("Приём команд не запущен: {e:#}");
     }
 
-    log::info!("Сеть: телеметрия UDP {PORT_TELEMETRY}, команды TCP {PORT_COMMAND}");
+    if let Err(e) = net::http_api::spawn(params.clone(), tele.clone(), status.clone()) {
+        log::error!("HTTP API не запущено: {e:#}");
+    }
+
+    log::info!("Сеть: телеметрия UDP {PORT_TELEMETRY}, команды TCP {PORT_COMMAND}, HTTP :{HTTP_PORT}");
     log::info!(
         "OTA: работаю из слота {}, обновление уйдёт в {}",
         net::ota::running_slot_label(),

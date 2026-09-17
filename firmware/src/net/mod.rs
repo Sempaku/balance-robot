@@ -5,6 +5,7 @@
 //! нет — только атомики и снимки состояния.
 
 pub mod command;
+pub mod http_api;
 pub mod ota;
 pub mod portal;
 pub mod protocol;
