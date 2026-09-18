@@ -1,4 +1,5 @@
-﻿using System.Windows.Threading;
+﻿using System.Collections.ObjectModel;
+using System.Windows.Threading;
 using BalanceBot.Core;
 using BalanceBot.Core.Input;
 using BalanceBot.Protocol.Packets;
@@ -12,10 +13,12 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
     private const byte StateBalancing = 1; // STATE_BALANCING в прошивке
     private const float StickDeadzone = 0.08f;
     private const float TrimStepDeg = 0.1f;
+    private const int GamepadLogLimit = 60;
 
     private readonly RobotSession _session;
     private readonly DispatcherTimer _driveLoopTimer;
     private readonly DualSenseInput _gamepad = new();
+    private readonly Dispatcher _dispatcher;
 
     private bool _keyW;
     private bool _keyS;
@@ -33,6 +36,12 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isGamepadActive = true;
     [ObservableProperty] private string _gamepadStatusText = "Не найден";
 
+    /// <summary>Устройства из последнего поиска HID.</summary>
+    public ObservableCollection<GamepadCandidate> GamepadDevices { get; } = new();
+
+    /// <summary>Журнал подключения геймпада.</summary>
+    public ObservableCollection<string> GamepadLog { get; } = new();
+
     // Телеметрия для обратной связи на геймпад (фаза 2)
     private volatile float _teleAngle;
     private volatile float _teleTrim;
@@ -49,6 +58,7 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
     public ControlViewModel(RobotSession session)
     {
         _session = session;
+        _dispatcher = Dispatcher.CurrentDispatcher;
 
         // Отправка команд каждые 28 мс (~35 Гц)
         _driveLoopTimer = new DispatcherTimer(DispatcherPriority.Send)
@@ -62,6 +72,7 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
         _gamepad.Connected += OnGamepadConnected;
         _gamepad.Disconnected += OnGamepadDisconnected;
         _gamepad.ButtonPressed += OnGamepadButton;
+        _gamepad.Log += OnGamepadLog;
         _gamepad.Start();
 
         // Телеметрия → вибрация и lightbar (фаза 2)
@@ -162,7 +173,9 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
     private void OnGamepadDisconnected()
     {
         IsGamepadConnected = false;
-        GamepadStatusText = "Не найден";
+        GamepadStatusText = _gamepad.ManualPath != null
+            ? "Устройство отключено (ручной выбор)"
+            : "Не найден";
 
         // Геймпад пропал — немедленно глушим ход; дальше страхует
         // прошивочный watchdog 300 мс
@@ -172,6 +185,68 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
             CurrentTurn = 0f;
             _session.Drive(0f, 0f);
         }
+    }
+
+    private void OnGamepadLog(string line)
+    {
+        void Add()
+        {
+            GamepadLog.Add(line);
+            while (GamepadLog.Count > GamepadLogLimit)
+            {
+                GamepadLog.RemoveAt(0);
+            }
+        }
+
+        if (_dispatcher.CheckAccess())
+        {
+            Add();
+        }
+        else
+        {
+            _dispatcher.BeginInvoke(Add);
+        }
+    }
+
+    /// <summary>Поиск HID-устройств для панели геймпада.</summary>
+    [RelayCommand]
+    private async Task RescanGamepadsAsync()
+    {
+        GamepadStatusText = "Сканирую HID...";
+        var devices = await Task.Run(DualSenseInput.Scan);
+
+        GamepadDevices.Clear();
+        foreach (var device in devices)
+        {
+            GamepadDevices.Add(device);
+        }
+
+        GamepadStatusText = devices.Count == 0
+            ? "Геймпады не найдены"
+            : $"Найдено: {devices.Count}";
+        OnGamepadLog($"{DateTime.Now:HH:mm:ss} Поиск: найдено устройств — {devices.Count}");
+    }
+
+    /// <summary>Ручное подключение к выбранному устройству из списка.</summary>
+    [RelayCommand]
+    private void ConnectGamepad(string path)
+    {
+        _gamepad.ConnectTo(path);
+    }
+
+    /// <summary>Возврат к автопоиску DualSense.</summary>
+    [RelayCommand]
+    private void UseAutoGamepad()
+    {
+        _gamepad.UseAuto();
+    }
+
+    /// <summary>Тест вибрации и lightbar на 600 мс.</summary>
+    [RelayCommand]
+    private void TestRumble()
+    {
+        _gamepad.SetFeedback(220, 220, 0, 60, 0);
+        _fbRumble = 255; // заставит цикл обратной связи вернуть нормальное состояние
     }
 
     private void OnGamepadButton(DualSenseButtons buttons)

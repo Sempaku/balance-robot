@@ -1,4 +1,7 @@
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+using System.Text.RegularExpressions;
+using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 
 namespace BalanceBot.Core.Input;
@@ -8,6 +11,7 @@ namespace BalanceBot.Core.Input;
 /// синхронное чтение input-отчётов, запись output-отчётов и feature-запросы.
 /// Без внешних зависимостей — только P/Invoke.
 /// </summary>
+[SupportedOSPlatform("windows")]
 internal static class WinHid
 {
     private static readonly Guid HidGuid = new("4d1e55b2-f16f-11cf-88cb-001111000030");
@@ -21,6 +25,10 @@ internal static class WinHid
     private const uint FileShareWrite = 0x00000002;
     private const uint OpenExisting = 3;
 
+    // UsagePage/Usage топ-уровневой коллекции (Generic Desktop / Game Pad)
+    public const ushort UsagePageGenericDesktop = 0x01;
+    public const ushort UsageGamePad = 0x05;
+
     [StructLayout(LayoutKind.Sequential)]
     private struct SpDeviceInterfaceData
     {
@@ -28,6 +36,28 @@ internal static class WinHid
         public Guid InterfaceClassGuid;
         public uint Flags;
         public IntPtr Reserved;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct HidpCaps
+    {
+        public ushort Usage;
+        public ushort UsagePage;
+        public ushort InputReportByteLength;
+        public ushort OutputReportByteLength;
+        public ushort FeatureReportByteLength;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 17)]
+        public ushort[] Reserved;
+        public ushort NumberLinkCollectionNodes;
+        public ushort NumberInputButtonCaps;
+        public ushort NumberInputValueCaps;
+        public ushort NumberInputDataIndices;
+        public ushort NumberOutputButtonCaps;
+        public ushort NumberOutputValueCaps;
+        public ushort NumberOutputDataIndices;
+        public ushort NumberFeatureButtonCaps;
+        public ushort NumberFeatureValueCaps;
+        public ushort NumberFeatureDataIndices;
     }
 
     [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -57,17 +87,62 @@ internal static class WinHid
     [DllImport("hid.dll", SetLastError = true)]
     private static extern bool HidD_GetFeature(SafeFileHandle file, byte[] reportBuffer, uint reportBufferLength);
 
+    [DllImport("hid.dll", SetLastError = true)]
+    private static extern bool HidD_GetPreparsedData(SafeFileHandle file, out IntPtr preparsedData);
+
+    [DllImport("hid.dll", SetLastError = true)]
+    private static extern bool HidP_GetCaps(IntPtr preparsedData, ref HidpCaps caps);
+
+    [DllImport("hid.dll", SetLastError = true)]
+    private static extern bool HidD_FreePreparsedData(IntPtr preparsedData);
+
+    private static readonly Regex VidPidRegex = new(
+        @"vid_([0-9a-f]{4})&pid_([0-9a-f]{4})",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     /// <summary>
-    /// Пути HID-устройств с заданным VID/PID (присутствующих в системе).
+    /// Все пути HID-интерфейсов в системе: SetupAPI + реестр DeviceClasses.
+    ///
+    /// Реестр — обход скрытия HidHide (из комплекта DS4Windows/ViGEm):
+    /// он убирает интерфейсы из перечисления SetupAPI для посторонних
+    /// процессов, но прямое открытие пути при этом работает. Реестр
+    /// содержит и устаревшие записи — они отфильтруются при открытии.
+    /// </summary>
+    public static List<string> EnumerateAllPaths()
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var path in EnumerateViaSetupApi())
+        {
+            result.Add(path);
+        }
+
+        foreach (var path in EnumerateViaRegistry())
+        {
+            result.Add(path);
+        }
+
+        return result.ToList();
+    }
+
+    /// <summary>
+    /// Пути HID-устройств с заданным VID/PID.
     /// </summary>
     public static List<string> EnumeratePaths(ushort vid, ushort pid)
     {
-        var result = new List<string>();
+        string needle = $"vid_{vid:x4}&pid_{pid:x4}";
+        return EnumerateAllPaths()
+            .Where(p => p.Contains(needle, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private static IEnumerable<string> EnumerateViaSetupApi()
+    {
         var guid = HidGuid;
         IntPtr infoSet = SetupDiGetClassDevs(ref guid, IntPtr.Zero, IntPtr.Zero, DigcfPresent | DigcfDeviceInterface);
         if (infoSet == IntPtr.Zero || infoSet == new IntPtr(-1))
         {
-            return result;
+            yield break;
         }
 
         try
@@ -90,10 +165,9 @@ internal static class WinHid
                     Marshal.WriteInt32(buffer, cbSize);
                     if (SetupDiGetDeviceInterfaceDetail(infoSet, ref data, buffer, required, ref required, IntPtr.Zero))
                     {
-                        string path = Marshal.PtrToStringUni(buffer + cbSize) ?? string.Empty;
-                        if (path.Contains($"vid_{vid:x4}&pid_{pid:x4}", StringComparison.OrdinalIgnoreCase))
+                        if (Marshal.PtrToStringUni(buffer + cbSize) is string path)
                         {
-                            result.Add(path);
+                            yield return path;
                         }
                     }
                 }
@@ -107,8 +181,42 @@ internal static class WinHid
         {
             SetupDiDestroyDeviceInfoList(infoSet);
         }
+    }
 
-        return result;
+    private static IEnumerable<string> EnumerateViaRegistry()
+    {
+        using var key = Registry.LocalMachine.OpenSubKey(
+            @"SYSTEM\CurrentControlSet\Control\DeviceClasses\{4d1e55b2-f16f-11cf-88cb-001111000030}");
+
+        if (key == null)
+        {
+            yield break;
+        }
+
+        foreach (var name in key.GetSubKeyNames())
+        {
+            // "##?#HID#..." -> "\\?\HID#..."
+            if (name.StartsWith("##?#", StringComparison.Ordinal))
+            {
+                yield return @"\\?\" + name[4..];
+            }
+        }
+    }
+
+    /// <summary>
+    /// VID/PID из пути устройства; (0, 0), если не распознано.
+    /// </summary>
+    public static (ushort Vid, ushort Pid) ParseVidPid(string path)
+    {
+        var match = VidPidRegex.Match(path);
+        if (!match.Success)
+        {
+            return (0, 0);
+        }
+
+        return (
+            Convert.ToUInt16(match.Groups[1].Value, 16),
+            Convert.ToUInt16(match.Groups[2].Value, 16));
     }
 
     /// <summary>
@@ -119,6 +227,36 @@ internal static class WinHid
     {
         uint access = GenericRead | (writeAccess ? GenericWrite : 0u);
         return CreateFile(path, access, FileShareRead | FileShareWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+    }
+
+    /// <summary>
+    /// Usage топ-уровневой коллекции устройства (например, Game Pad).
+    /// false — определить не удалось.
+    /// </summary>
+    public static bool TryGetUsage(SafeFileHandle file, out ushort usagePage, out ushort usage)
+    {
+        usagePage = 0;
+        usage = 0;
+
+        if (HidD_GetPreparsedData(file, out IntPtr preparsed) && preparsed != IntPtr.Zero)
+        {
+            try
+            {
+                var caps = new HidpCaps { Reserved = new ushort[17] };
+                if (HidP_GetCaps(preparsed, ref caps))
+                {
+                    usagePage = caps.UsagePage;
+                    usage = caps.Usage;
+                    return true;
+                }
+            }
+            finally
+            {
+                HidD_FreePreparsedData(preparsed);
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

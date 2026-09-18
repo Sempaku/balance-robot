@@ -714,7 +714,10 @@ DualSense (HID USB/BT) → DualSenseInput (поток чтения)
 ```
 
 **Фаза 1 — управление:**
-- `WinHid.cs`: перечисление HID по VID/PID (SetupAPI), блокирующее чтение, запись, feature-запросы, CancelIoEx
+- `WinHid.cs`: перечисление HID по VID/PID (SetupAPI **+ реестр DeviceClasses**), блокирующее чтение, запись, feature-запросы, CancelIoEx
+- Обход HidHide (из комплекта DS4Windows/ViGEm): он прячет HID-интерфейсы из перечисления SetupAPI, но прямое открытие пути работает — fallback читает пути из реестра `HKLM\...\DeviceClasses\{hid-guid}`, устаревшие записи отсеиваются при открытии
+- Выбор правильного интерфейса: usage топ-коллекции (Generic Desktop / Game Pad) через `HidP_GetCaps` — у DualSense игровой интерфейс USB это `MI_03`
+- Панель поиска в UI: «🔄 Поиск» — список найденных устройств (DualSense + любые геймпады по usage) с кнопкой «Подключить», «⚙ Авто» — возврат к автопоиску, «📳 Тест» — проверка вибрации/lightbar, журнал подключения
 - `DualSenseInput.cs`: парсинг трёх раскладок отчётов (раскладки из SDL2 `SDL_hidapi_ps5.c`):
   - USB input 0x01 (64 байта): стики @1..4, триггеры @5..6, кнопки @8..10
   - BT enhanced input 0x31 (78 байт): стики @3..6, триггеры @7..8, кнопки @10..12

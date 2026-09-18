@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using Microsoft.Win32.SafeHandles;
 
 namespace BalanceBot.Core.Input;
@@ -45,6 +46,25 @@ public readonly record struct DualSenseState(
     DualSenseButtons Buttons);
 
 /// <summary>
+/// Кандидат из сканирования HID: найденное устройство для панели поиска.
+/// </summary>
+public sealed record GamepadCandidate(
+    string Path,
+    ushort Vid,
+    ushort Pid,
+    bool IsBluetooth,
+    bool IsGamepadInterface,
+    bool IsDualSense,
+    bool EffectsWritable)
+{
+    public string Display =>
+        $"{(IsDualSense ? "DualSense" : "Геймпад")} · {(IsBluetooth ? "Bluetooth" : "USB")} · "
+        + $"VID_{Vid:X4} PID_{Pid:X4}"
+        + (IsGamepadInterface ? "" : " · не игровой интерфейс")
+        + (EffectsWritable ? "" : " · без эффектов");
+}
+
+/// <summary>
 /// Чтение геймпада DualSense через raw HID (без внешних библиотек).
 ///
 /// Поддерживаются оба транспорта:
@@ -54,7 +74,11 @@ public readonly record struct DualSenseState(
 ///
 /// Раскладки отчётов — из SDL2 (src/joystick/hidapi/SDL_hidapi_ps5.c).
 /// Для BT feature-запрос 0x09 переключает геймпад в enhanced-режим.
+///
+/// Поиск устройств: SetupAPI + реестр DeviceClasses (обход скрытия HidHide
+/// из комплекта DS4Windows/ViGEm). Поддерживается ручной выбор устройства.
 /// </summary>
+[SupportedOSPlatform("windows")]
 public sealed class DualSenseInput : IDisposable
 {
     private const ushort VendorId = 0x054C;
@@ -93,12 +117,18 @@ public sealed class DualSenseInput : IDisposable
     private bool _ledResetDone;
     private DateTime _ledReadyAt;
 
+    private volatile string? _manualPath;
+    private bool _loggedNotFound;
+
     public bool IsConnected { get; private set; }
 
     public DualSenseTransport Transport { get; private set; }
 
     /// <summary>Возможность output-отчётов (вибрация, lightbar).</summary>
     public bool EffectsSupported { get; private set; }
+
+    /// <summary>Выбранный вручную путь устройства (null = автопоиск).</summary>
+    public string? ManualPath => _manualPath;
 
     public DualSenseState State
     {
@@ -114,6 +144,9 @@ public sealed class DualSenseInput : IDisposable
 
     /// <summary>Нажатие кнопок (только фронт: новые нажатые с прошлого отчёта).</summary>
     public event Action<DualSenseButtons>? ButtonPressed;
+
+    /// <summary>Журнал подключения для панели диагностики.</summary>
+    public event Action<string>? Log;
 
     /// <summary>
     /// Запуск фонового потока: поиск устройства, чтение отчётов,
@@ -135,6 +168,32 @@ public sealed class DualSenseInput : IDisposable
     }
 
     /// <summary>
+    /// Ручное подключение к конкретному HID-пути (из панели поиска).
+    /// Текущее подключение разрывается, цикл подхватит новый путь.
+    /// </summary>
+    public void ConnectTo(string path)
+    {
+        _manualPath = path;
+        _loggedNotFound = false;
+        LogLine($"Ручное подключение: {ShortPath(path)}");
+        BreakCurrentConnection();
+    }
+
+    /// <summary>Возврат к автопоиску DualSense.</summary>
+    public void UseAuto()
+    {
+        if (_manualPath == null)
+        {
+            return;
+        }
+
+        _manualPath = null;
+        _loggedNotFound = false;
+        LogLine("Автопоиск DualSense");
+        BreakCurrentConnection();
+    }
+
+    /// <summary>
     /// Вибрация (0..255) и цвет lightbar. Ничего не делает без подключения.
     /// </summary>
     public void SetFeedback(byte rumbleLeft, byte rumbleRight, byte ledR, byte ledG, byte ledB)
@@ -149,6 +208,63 @@ public sealed class DualSenseInput : IDisposable
         }
 
         SendEffects();
+    }
+
+    /// <summary>
+    /// Сканирование HID для панели поиска: присутствующие устройства,
+    /// которые являются DualSense или игровыми контроллерами (usage Game Pad).
+    /// </summary>
+    public static List<GamepadCandidate> Scan()
+    {
+        var result = new List<GamepadCandidate>();
+
+        foreach (var path in WinHid.EnumerateAllPaths())
+        {
+            var (vid, pid) = WinHid.ParseVidPid(path);
+            if (vid == 0)
+            {
+                continue;
+            }
+
+            // Проверяем присутствие и usage открытием (устаревшие записи реестра не откроются)
+            var probe = WinHid.Open(path, writeAccess: false);
+            if (probe.IsInvalid)
+            {
+                probe.Dispose();
+                continue;
+            }
+
+            bool usageKnown = WinHid.TryGetUsage(probe, out ushort usagePage, out ushort usage);
+            probe.Dispose();
+
+            bool isGamepad = usageKnown
+                && usagePage == WinHid.UsagePageGenericDesktop
+                && usage == WinHid.UsageGamePad;
+
+            bool isDualSense = vid == VendorId && ProductIds.Contains(pid);
+            if (!isGamepad && !isDualSense)
+            {
+                continue;
+            }
+
+            var rw = WinHid.Open(path, writeAccess: true);
+            bool writable = !rw.IsInvalid;
+            if (writable)
+            {
+                rw.Dispose();
+            }
+
+            result.Add(new GamepadCandidate(
+                path, vid, pid,
+                path.Contains("bthenum", StringComparison.OrdinalIgnoreCase),
+                isGamepad, isDualSense, writable));
+        }
+
+        // USB-устройства вперёд: стабильнее, без CRC и keep-alive
+        return result
+            .OrderBy(c => c.IsBluetooth ? 1 : 0)
+            .ThenByDescending(c => c.IsGamepadInterface)
+            .ToList();
     }
 
     public void Dispose()
@@ -192,6 +308,25 @@ public sealed class DualSenseInput : IDisposable
         _cts.Dispose();
     }
 
+    private void LogLine(string message)
+    {
+        Log?.Invoke($"{DateTime.Now:HH:mm:ss} {message}");
+    }
+
+    private void BreakCurrentConnection()
+    {
+        SafeFileHandle? handle;
+        lock (_sync)
+        {
+            handle = _handle;
+        }
+
+        if (handle != null)
+        {
+            WinHid.CancelIo(handle); // разбудит ReadLoop → finally → переподключение
+        }
+    }
+
     private void RunLoop()
     {
         while (!_cts.IsCancellationRequested)
@@ -199,10 +334,18 @@ public sealed class DualSenseInput : IDisposable
             try
             {
                 ConnectOnce();
+                _loggedNotFound = false;
             }
             catch
             {
                 // устройство пропало или не найдено — повторим через секунду
+                if (!_loggedNotFound)
+                {
+                    _loggedNotFound = true;
+                    LogLine(_manualPath != null
+                        ? "Устройство недоступно, повторяю попытки..."
+                        : "DualSense не найден (если стоит HidHide/DS4Windows — используйте поиск и ручное подключение)");
+                }
             }
 
             if (!_cts.IsCancellationRequested)
@@ -214,14 +357,49 @@ public sealed class DualSenseInput : IDisposable
 
     private void ConnectOnce()
     {
-        string? path = FindDevicePath();
-        if (path == null)
+        foreach (var path in CandidatePaths())
         {
-            throw new IOException("DualSense не найден");
+            if (_cts.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (TryConnectTo(path))
+            {
+                return;
+            }
         }
 
+        throw new IOException("Ни один кандидат не открылся");
+    }
+
+    private List<string> CandidatePaths()
+    {
+        if (_manualPath != null)
+        {
+            return [_manualPath];
+        }
+
+        var paths = new List<string>();
+        foreach (var pid in ProductIds)
+        {
+            paths.AddRange(WinHid.EnumeratePaths(VendorId, pid));
+        }
+
+        // USB предпочтительнее BT; игровой интерфейс (usage Game Pad) —
+        // приоритетнее прочих коллекций того же устройства
+        return paths
+            .OrderBy(p => p.Contains("bthenum", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Попытка подключения к одному пути. false — не открылся или
+    /// не игровой интерфейс (пробуем следующий кандидат).
+    /// </summary>
+    private bool TryConnectTo(string path)
+    {
         bool isBt = path.Contains("bthenum", StringComparison.OrdinalIgnoreCase);
-        Transport = isBt ? DualSenseTransport.Bluetooth : DualSenseTransport.Usb;
 
         var handle = WinHid.Open(path, writeAccess: true);
         EffectsSupported = !handle.IsInvalid;
@@ -232,10 +410,22 @@ public sealed class DualSenseInput : IDisposable
             if (handle.IsInvalid)
             {
                 handle.Dispose();
-                throw new IOException("HID-устройство занято");
+                return false; // устаревшая запись реестра или занято
             }
         }
 
+        // Игровой интерфейс определяем по usage топ-коллекции;
+        // если usage не читается — принимаем как есть.
+        // Для вручную выбранного пути не отсеиваем: выбор осознанный
+        if (_manualPath == null
+            && WinHid.TryGetUsage(handle, out ushort usagePage, out ushort usage)
+            && (usagePage != WinHid.UsagePageGenericDesktop || usage != WinHid.UsageGamePad))
+        {
+            handle.Dispose();
+            return false;
+        }
+
+        Transport = isBt ? DualSenseTransport.Bluetooth : DualSenseTransport.Usb;
         lock (_sync)
         {
             _handle = handle;
@@ -270,6 +460,8 @@ public sealed class DualSenseInput : IDisposable
                     500);
             }
 
+            LogLine($"Подключён: {(isBt ? "Bluetooth" : "USB")}, "
+                + $"эффекты: {(EffectsSupported ? "да" : "нет")} — {ShortPath(path)}");
             Connected?.Invoke();
             if (EffectsSupported)
             {
@@ -277,6 +469,8 @@ public sealed class DualSenseInput : IDisposable
             }
 
             ReadLoop(handle);
+            LogLine("Поток отчётов прервался — переподключение");
+            return true;
         }
         finally
         {
@@ -294,27 +488,14 @@ public sealed class DualSenseInput : IDisposable
         }
     }
 
-    private static string? FindDevicePath()
+    private static string ShortPath(string path)
     {
-        foreach (var pid in ProductIds)
-        {
-            var paths = WinHid.EnumeratePaths(VendorId, pid);
-
-            // USB предпочтительнее: стабильнее, без CRC и keep-alive
-            var usb = paths.FirstOrDefault(p =>
-                !p.Contains("bthenum", StringComparison.OrdinalIgnoreCase));
-            if (usb != null)
-            {
-                return usb;
-            }
-
-            if (paths.Count > 0)
-            {
-                return paths[0];
-            }
-        }
-
-        return null;
+        // "\\?\hid#vid_054c&pid_0ce6&mi_03#8&1f417723..." -> "vid_054c&pid_0ce6&mi_03"
+        var match = System.Text.RegularExpressions.Regex.Match(
+            path,
+            @"vid_[0-9a-f]{4}&pid_[0-9a-f]{4}(&mi_\d+)?",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success ? match.Value : path;
     }
 
     private void ReadLoop(SafeFileHandle handle)
