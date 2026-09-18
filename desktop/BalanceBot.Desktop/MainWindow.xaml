@@ -122,6 +122,20 @@
                             </StackPanel>
                         </Border>
 
+                        <Border Style="{StaticResource CardPanel}" Margin="3,0,3,0">
+                            <StackPanel>
+                                <TextBlock Text="НАКЛОН ХОДА (LEAN)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding Dashboard.Lean, StringFormat={}{0:+0.00;-0.00;0.00}°}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource WarningBrush}" Margin="0,4,0,0" ToolTip="Наклон контура скорости: висит у ±drive_lean — сатурация, тяги не хватает (см. отчёт DRIVE_CONTROL_REPORT)" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardPanel}" Margin="3,0,3,0">
+                            <StackPanel>
+                                <TextBlock Text="ТРИМ (РАВНОВЕСИЕ)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding Dashboard.Trim, StringFormat={}{0:+0.00;-0.00;0.00}°}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}" Margin="0,4,0,0" ToolTip="Выученная точка равновесия (адаптируется в покое и на ходу)" />
+                            </StackPanel>
+                        </Border>
+
                         <Border Style="{StaticResource CardPanel}" Margin="6,0,0,0">
                             <StackPanel>
                                 <TextBlock Text="ЦИКЛ / ОШИБКИ IMU" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />

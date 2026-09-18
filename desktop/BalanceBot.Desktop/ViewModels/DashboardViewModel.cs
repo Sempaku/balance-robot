@@ -53,8 +53,8 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _showAccelAngle = false;
     [ObservableProperty] private bool _showGyro = true;
     [ObservableProperty] private bool _showTrim = true;
-    [ObservableProperty] private bool _showLean = false;
 
+    [ObservableProperty] private bool _showLean = true;
     // === Видимость каналов нижнего графика ===
     [ObservableProperty] private bool _showCmd = true;
 
@@ -74,6 +74,7 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
     [ObservableProperty] private float _wheelRateRps;
     [ObservableProperty] private float _cmdRps;
     [ObservableProperty] private float _trim;
+    [ObservableProperty] private float _lean;
     [ObservableProperty] private int _steps;
     [ObservableProperty] private ushort _dtUs;
     [ObservableProperty] private ushort _loopUs;
@@ -190,6 +191,7 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
         WheelRateRps = latest.WheelRate / 3200.0f;
         CmdRps = latest.Cmd / 3200.0f;
         Trim = latest.Trim;
+        Lean = latest.TermLean;
         Steps = latest.Steps;
         DtUs = latest.DtUs;
         LoopUs = latest.LoopUs;
