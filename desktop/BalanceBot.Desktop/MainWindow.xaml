@@ -400,7 +400,7 @@
                                         </StackPanel>
                                         <CheckBox Grid.Column="1" IsChecked="{Binding Control.IsGamepadActive}" VerticalAlignment="Center" />
                                     </Grid>
-                                    <TextBlock Text="✕ — баланс, ○ — стоп, PS — аварийный стоп, D-pad ↑↓ — трим ±0.1°, R2 — форсаж, create — вкл/выкл"
+                                    <TextBlock Text="✕ — баланс, ○ — стоп, PS — аварийный стоп, R2 — форсаж, D-pad — трим и тяга (полная раскладка справа)"
                                                FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,0" />
                                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                         <Button Content="🔄 Поиск" Style="{StaticResource SecondaryButton}" FontSize="11" Padding="10,5"
@@ -449,6 +449,7 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
@@ -492,8 +493,67 @@
                                 <TextBlock Text="Клавиша ПРОБЕЛ мгновенно глушит моторы" FontSize="12" Foreground="{StaticResource DangerBrush}" HorizontalAlignment="Center" Margin="0,24,0,16" FontWeight="SemiBold" />
                             </StackPanel>
 
-                            <!-- Поиск геймпада и журнал подключения -->
+                            <!-- Раскладка геймпада -->
                             <Border Grid.Row="1" Background="#12141A" CornerRadius="8" Padding="14" Margin="0,0,0,12"
+                                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="🎮 РАСКЛАДКА ГЕЙМПАДА (DUALSENSE)" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,8" />
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="160" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Левый стик ↑ ↓" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Ход вперёд / назад (полный стик = тяга как у клавиатуры)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2" TextWrapping="Wrap" />
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Правый стик ← →" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="Разворот на месте" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2" />
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="R2 (удерживать)" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="Форсаж: добавляет тягу до 100% (без него — ограничение тяги)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2" TextWrapping="Wrap" />
+
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="✕ (крест)" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" Margin="0,2" />
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Включить баланс" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2" />
+
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="○ (круг)" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource WarningBrush}" Margin="0,2" />
+                                        <TextBlock Grid.Row="4" Grid.Column="1" Text="Выключить баланс (стоп)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2" />
+
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="PS" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DangerBrush}" Margin="0,2" />
+                                        <TextBlock Grid.Row="5" Grid.Column="1" Text="Аварийный стоп — работает всегда, даже при выключенном геймпад-управлении" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2" TextWrapping="Wrap" />
+
+                                        <TextBlock Grid.Row="6" Grid.Column="0" Text="D-pad ↑ ↓" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2" />
+                                        <TextBlock Grid.Row="6" Grid.Column="1" Text="Трим ±0.1° (наклон корпуса вперёд/назад, сохраняется в NVS)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2" TextWrapping="Wrap" />
+
+                                        <TextBlock Grid.Row="7" Grid.Column="0" Text="D-pad ← →" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2" />
+                                        <TextBlock Grid.Row="7" Grid.Column="1" Text="Ограничение тяги ±5%" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2" />
+
+                                        <TextBlock Grid.Row="8" Grid.Column="0" Text="create" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2" />
+                                        <TextBlock Grid.Row="8" Grid.Column="1" Text="Вкл / выкл управление с геймпада" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2" />
+
+                                        <TextBlock Grid.Row="9" Grid.Column="0" Text="Lightbar" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2" />
+                                        <TextBlock Grid.Row="9" Grid.Column="1" Text="🟢 баланс · 🔵 ожидание · 🔴 близко к падению · 🟣 ошибка IMU · ⚪ нет телеметрии" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2" TextWrapping="Wrap" />
+
+                                        <TextBlock Grid.Row="10" Grid.Column="0" Text="Вибрация" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2" />
+                                        <TextBlock Grid.Row="10" Grid.Column="1" Text="Импульс — упал/стоп · нарастающая — приближение к падению" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2" TextWrapping="Wrap" />
+
+                                        <TextBlock Grid.Row="11" Grid.Column="0" Grid.ColumnSpan="2" Text="Не задействованы: △, □, L1, R1, L2, L3, R3, options, тачпад"
+                                                   FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,6,0,0" Opacity="0.7" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Поиск геймпада и журнал подключения -->
+                            <Border Grid.Row="2" Background="#12141A" CornerRadius="8" Padding="14" Margin="0,0,0,12"
                                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" VerticalAlignment="Top">
                                 <StackPanel>
                                     <TextBlock Text="ПОИСК ГЕЙМПАДА (HID)" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,8" />

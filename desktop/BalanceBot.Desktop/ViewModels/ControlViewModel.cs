@@ -122,9 +122,10 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
         {
             var s = _gamepad.State;
 
-            // R2 — форсаж: 35% тяги без нажатия, 100% при полном нажатии
-            float boost = 0.35f + 0.65f * s.R2;
-            CurrentForward = Deadzone(s.LeftStickY) * SpeedScale * boost;
+            // Полный стик = тяга SpeedScale (как клавиатура);
+            // R2 добавляет остаток до 100%
+            float boost = SpeedScale + (1f - SpeedScale) * s.R2;
+            CurrentForward = Deadzone(s.LeftStickY) * boost;
             CurrentTurn = Deadzone(s.RightStickX) * TurnScale;
         }
         else if (!IsKeyboardActive)
@@ -282,6 +283,14 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
         else if ((buttons & DualSenseButtons.DpadDown) != 0)
         {
             RunAsync(() => NudgeTrimAsync(-TrimStepDeg));
+        }
+        else if ((buttons & DualSenseButtons.DpadRight) != 0)
+        {
+            SpeedScale = Math.Min(1f, SpeedScale + 0.05f);
+        }
+        else if ((buttons & DualSenseButtons.DpadLeft) != 0)
+        {
+            SpeedScale = Math.Max(0.1f, SpeedScale - 0.05f);
         }
     }
 
