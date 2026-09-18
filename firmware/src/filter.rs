@@ -2,6 +2,11 @@
 //! и адаптацией к вибрациям шаговых двигателей.
 
 const MAX_CORRECTION_DEG: f32 = 8.0;
+/// Лимит коррекции вне баланса: после падения/подъёма угол может расходиться
+/// с акселерометром на 30–90°, и обычный лимит 8° стягивает его со скоростью
+/// ~5°/с — приходится ждать, пока фильтр «доедет» до вертикали перед армингом.
+/// В покое разрешаем тянуть сильно быстрее (тау остаётся той же).
+const MAX_CORRECTION_IDLE_DEG: f32 = 90.0;
 const MAX_BIAS_DPS: f32 = 15.0;
 const BIAS_GAIN: f32 = 0.2;
 
@@ -73,7 +78,12 @@ impl ComplementaryFilter {
     /// Во время разгона/торможения акселерометр «видит» ускорение как наклон,
     /// и оценка дрейфа на таких данных уползает: после поездки угол начинает
     /// плыть. Поэтому дрейф дооцениваем только когда колёса почти стоят.
-    /// 
+    ///
+    /// `fast_converge` — быстрое схождение к акселерометру (вне баланса):
+    /// после падения и подъёма робота не ждём, пока лимит 8° вытянет угол
+    /// к вертикали. В балансе не включать: лимит защищает от выбросов
+    /// акселерометра на вибрациях.
+    ///
     /// Адаптация к вибрациям:
     /// - Оцениваем текущий уровень вибрации по отклонению accel_magnitude от 1g
     /// - Сглаживаем оценку экспоненциальным фильтром
@@ -86,6 +96,7 @@ impl ComplementaryFilter {
         accel_magnitude_g: f32,
         dt: f32,
         bias_adapt: bool,
+        fast_converge: bool,
     ) -> f32 {
         if !dt.is_finite() || dt <= 0.0 || dt > 0.05 {
             return self.angle;
@@ -122,12 +133,27 @@ impl ComplementaryFilter {
         self.correction_weight += (target_weight - self.correction_weight) * filter_alpha;
 
         if self.correction_weight > 0.0 {
-            let error = (accel_angle - self.angle).clamp(-MAX_CORRECTION_DEG, MAX_CORRECTION_DEG);
+            let error_raw = accel_angle - self.angle;
+
+            // В покое тянем к акселерометру с широким лимитом (быстрое
+            // схождение после падения), в балансе — с прежним 8°
+            let max_corr = if fast_converge {
+                MAX_CORRECTION_IDLE_DEG
+            } else {
+                MAX_CORRECTION_DEG
+            };
+            let error = error_raw.clamp(-max_corr, max_corr);
             self.angle += self.kp * self.correction_weight * error * dt;
 
-            // ВАЖНО: Адаптируем дрейф нуля ТОЛЬКО около вертикали (< 15°)
-            // и только в покое. Когда робот лежит на полу или едет, дрейф не копится!
-            if bias_adapt && self.angle.abs() < 15.0 && self.correction_weight > 0.5 {
+            // ВАЖНО: Адаптируем дрейф нуля ТОЛЬКО около вертикали (< 15°),
+            // только в поке и только когда угол уже сошёлся к акселерометру
+            // (иначе быстрое схождение с большого расхождения отравило бы
+            // оценку дрейфа). Когда робот лежит на полу или едет, дрейф не копится!
+            if bias_adapt
+                && self.angle.abs() < 15.0
+                && self.correction_weight > 0.5
+                && error_raw.abs() <= MAX_CORRECTION_DEG
+            {
                 self.bias = (self.bias - BIAS_GAIN * self.correction_weight * error * dt)
                     .clamp(-MAX_BIAS_DPS, MAX_BIAS_DPS);
             }

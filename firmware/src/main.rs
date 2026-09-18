@@ -310,12 +310,21 @@ fn robot_main() -> anyhow::Result<()> {
                 // разгоном акселерометр принимает ускорение за наклон.
                 let bias_adapt = wheel_rate.abs() < 200.0;
 
+                // Вне баланса фильтр быстро сходится к акселерометру:
+                // после падения и подъёма не ждём, пока угол «доедет»
+                // до вертикали перед повторным армингом. Во время
+                // автотюнинга не включаем — релейному тесту нужен
+                // гладкий гироскопный угол.
+                let fast_converge = !is_balancing
+                    && autotuner.state() == autotune::TuneState::Idle;
+
                 let angle = filter.update(
                     data.accel_angle_deg,
                     gyro,
                     data.accel_magnitude_g,
                     dt,
                     bias_adapt,
+                    fast_converge,
                 );
 
                 // Автонастройка PID: релейный тест на фильтрованном угле.
