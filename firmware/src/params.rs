@@ -112,6 +112,8 @@ declare_params! {
         "Торможение быстрее разгона: множитель скорости снижения целевой скорости при сбросе газа";
     brake_lean,     "brake_lean",   "×",          1.0,    2.0,     1.5,
         "Тормозной наклон: множитель к drive_lean при отклонении против движения (не выше предельного lean)";
+    drive_ff,       "drive_ff",     "",           0.0,    1.0,     0.0,
+        "Прямая связь стик-наклон: доля drive_lean сразу по отклонению стика. 0 = выкл (рекомендуется с trim_adapt)";
     fall_angle_deg, "fall",         "°",          5.0,    45.0,    22.0,
         "Порог падения: отклонение от целевого угла хода";
     fall_gyro_dps,  "fall_gyro",    "°/с",        50.0,   800.0,   260.0,
@@ -146,6 +148,7 @@ impl Params {
             trim_adapt_drive: self.trim_adapt_drive,
             brake_rate: self.brake_rate,
             brake_lean: self.brake_lean,
+            drive_ff: self.drive_ff,
         }
     }
 }
