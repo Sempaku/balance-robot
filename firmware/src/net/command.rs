@@ -15,8 +15,10 @@ use crate::storage::{Storage, WifiNetwork};
 use crate::telemetry::Telemetry;
 
 const IDLE_TIMEOUT: Duration = Duration::from_secs(60);
-const LINE_LIMIT: usize = 2048;
+// Пакет команд: до 32 записей, каждая — компактный JSON-объект
+const LINE_LIMIT: usize = 8192;
 const MAX_NETWORKS: usize = 5;
+const BATCH_MAX_COMMANDS: usize = 32;
 
 pub struct Services {
     pub params: Arc<ParamStore>,
@@ -96,19 +98,104 @@ fn serve(stream: TcpStream, services: &Services) -> anyhow::Result<()> {
             return handle_ota(&request, &mut reader, &mut writer);
         }
 
-        let response = match dispatch(command, &request, services) {
-            Ok(mut value) => {
-                value["ok"] = Value::Bool(true);
-                value
-            }
-            Err(e) => json!({"ok": false, "error": format!("{e:#}")}),
-        };
+        let (response, reboot) = execute(command, &request, services);
         respond(&mut writer, &response)?;
 
-        if command == "reboot" {
+        if reboot {
             ota::reboot_soon(Duration::from_millis(200));
         }
     }
+}
+
+/// Выполнение одной строки-запроса. Возвращает ответ и признак
+/// отложенной перезагрузки (перезагружаем только после отправки ответа).
+fn execute(command: &str, request: &Value, services: &Services) -> (Value, bool) {
+    match command {
+        "batch" => match batch(request, services) {
+            Ok((mut value, reboot)) => {
+                value["ok"] = Value::Bool(true);
+                (value, reboot)
+            }
+            Err(e) => (json!({"ok": false, "error": format!("{e:#}")}), false),
+        },
+        _ => match dispatch(command, request, services) {
+            Ok(mut value) => {
+                value["ok"] = Value::Bool(true);
+                (value, command == "reboot")
+            }
+            Err(e) => (json!({"ok": false, "error": format!("{e:#}")}), false),
+        },
+    }
+}
+
+/// Пакетная обработка: массив команд в одном TCP-пакете, один ответ на пакет.
+///
+/// - `save_params` внутри пакета откладывается: все команды выполняются,
+///   затем параметры пишутся в NVS одной транзакцией;
+/// - `reboot` откладывается до конца пакета (после отправки ответа);
+/// - `ota` и вложенный `batch` не допускаются.
+///
+/// Ответ: `{"ok": true, "results": [{"ok": true, ...}, ...], "saved": true}`.
+fn batch(request: &Value, services: &Services) -> anyhow::Result<(Value, bool)> {
+    let Some(commands) = request.get("commands").and_then(Value::as_array) else {
+        anyhow::bail!("ожидался массив `commands`");
+    };
+    if commands.is_empty() {
+        anyhow::bail!("пакет пуст");
+    }
+    if commands.len() > BATCH_MAX_COMMANDS {
+        anyhow::bail!(
+            "в пакете {} команд, максимум {}",
+            commands.len(),
+            BATCH_MAX_COMMANDS
+        );
+    }
+
+    let mut results = Vec::with_capacity(commands.len());
+    let mut need_save = false;
+    let mut need_reboot = false;
+
+    for entry in commands {
+        let name = entry.get("cmd").and_then(Value::as_str).unwrap_or("");
+        let result = match name {
+            "ota" | "batch" => json!({
+                "ok": false,
+                "error": format!("команда `{name}` не допускается внутри пакета"),
+            }),
+            "save_params" => {
+                // Не пишем NVS немедленно: одна транзакция на весь пакет
+                need_save = true;
+                json!({ "ok": true, "deferred": true })
+            }
+            "reboot" => {
+                // Не перезагружаемся посреди пакета
+                need_reboot = true;
+                json!({ "ok": true, "deferred": true })
+            }
+            _ => match dispatch(name, entry, services) {
+                Ok(mut value) => {
+                    value["ok"] = Value::Bool(true);
+                    value
+                }
+                Err(e) => json!({ "ok": false, "error": format!("{e:#}") }),
+            },
+        };
+        results.push(result);
+    }
+
+    let mut response = json!({ "results": results });
+
+    if need_save {
+        match services.storage.save_params(&services.params) {
+            Ok(()) => response["saved"] = json!(true),
+            Err(e) => {
+                response["saved"] = json!(false);
+                response["save_error"] = json!(format!("{e:#}"));
+            }
+        }
+    }
+
+    Ok((response, need_reboot))
 }
 
 fn dispatch(command: &str, request: &Value, services: &Services) -> anyhow::Result<Value> {

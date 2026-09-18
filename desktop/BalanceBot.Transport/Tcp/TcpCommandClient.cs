@@ -190,6 +190,36 @@ public sealed class TcpCommandClient : IAsyncDisposable
         return doc.RootElement.TryGetProperty("ok", out var okProp) && okProp.GetBoolean();
     }
 
+    /// <summary>
+    /// Пакетная отправка команд: все команды уходят одним TCP-пакетом,
+    /// робот выполняет их по порядку и отвечает массивом результатов.
+    /// save_params внутри пакета пишется в NVS одной транзакцией,
+    /// reboot откладывается до выполнения всего пакета.
+    /// </summary>
+    public async Task<BatchResponse?> SendBatchAsync(IEnumerable<object> commands, CancellationToken ct = default)
+    {
+        string res = await SendRawCommandAsync(new { cmd = "batch", commands }, ct);
+        return JsonSerializer.Deserialize<BatchResponse>(res);
+    }
+
+    /// <summary>
+    /// Применить параметры и зафиксировать их в NVS одним пакетом
+    /// (одна транзакция записи вместо двух round-trip).
+    /// </summary>
+    public async Task<bool> SetAndSaveParamsAsync(Dictionary<string, float> parameters, CancellationToken ct = default)
+    {
+        var set = new Dictionary<string, object> { ["cmd"] = "set_params" };
+        foreach (var (k, v) in parameters) set[k] = v;
+
+        var response = await SendBatchAsync(new object[] { set, new { cmd = "save_params" } }, ct);
+        return response != null
+            && response.Ok
+            && response.Results.Count == 2
+            && response.Results[0].Ok
+            && response.Results[1].Ok
+            && response.Saved != false;
+    }
+
     public async Task<bool> SaveParamsToNvsAsync(CancellationToken ct = default)
     {
         string res = await SendRawCommandAsync(new { cmd = "save_params" }, ct);

@@ -61,3 +61,22 @@ public record AutotuneStatus(
     [property: JsonPropertyName("ku")] float Ku,
     [property: JsonPropertyName("tu")] float Tu
 );
+
+/// <summary>
+/// Результат одной команды из пакета (batch).
+/// </summary>
+public record BatchResult(
+    [property: JsonPropertyName("ok")] bool Ok,
+    [property: JsonPropertyName("error")] string? Error = null,
+    [property: JsonPropertyName("deferred")] bool Deferred = false
+);
+
+/// <summary>
+/// Ответ на пакет команд: результат каждой команды + признак записи в NVS.
+/// </summary>
+public record BatchResponse(
+    [property: JsonPropertyName("ok")] bool Ok,
+    [property: JsonPropertyName("results")] List<BatchResult> Results,
+    [property: JsonPropertyName("saved")] bool? Saved = null,
+    [property: JsonPropertyName("save_error")] string? SaveError = null
+);

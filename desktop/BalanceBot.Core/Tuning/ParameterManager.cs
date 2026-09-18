@@ -92,10 +92,19 @@ public sealed class ParameterManager
     /// </summary>
     public async Task<bool> SaveToNvsAsync(CancellationToken ct = default)
     {
-        // Сначала применяем несохраненные правки
+        // Несохраненные правки применяем и пишем NVS одним пакетом (одна транзакция)
         if (ModifiedValues.Count > 0)
         {
-            await ApplyModifiedAsync(ct);
+            bool success = await _tcpClient.SetAndSaveParamsAsync(ModifiedValues, ct);
+            if (success)
+            {
+                foreach (var (k, v) in ModifiedValues)
+                {
+                    CurrentValues[k] = v;
+                }
+                ModifiedValues.Clear();
+            }
+            return success;
         }
         return await _tcpClient.SaveParamsToNvsAsync(ct);
     }
