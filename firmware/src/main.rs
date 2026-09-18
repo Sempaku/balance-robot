@@ -79,6 +79,13 @@ const ARM_FAIL_COOLDOWN_MS: u32 = 2000; // Блокировка повторно
 /// Период цикла управления: 5 мс = 200 Гц.
 const CONTROL_PERIOD: Duration = Duration::from_millis(5);
 
+/// Автокалибровка гироскопа на неподвижном роботе: дрейф нуля
+/// (температурный, у клонов MPU доходит до ~8°/с) не должен наматывать угол.
+const AUTOCAL_STABLE_CYCLES: u32 = 300; // 1.5 с неподвижности перед калибровкой
+const AUTOCAL_DRIFT_DPS: f32 = 1.5;     // выше этого считаем дрейф значимым
+const AUTOCAL_ACCEL_SPREAD_DEG: f32 = 2.0; // корпус не наклоняют
+const AUTOCAL_COOLDOWN: Duration = Duration::from_secs(10);
+
 fn main() {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
@@ -197,6 +204,12 @@ fn robot_main() -> anyhow::Result<()> {
     let mut arm_fail_timer: Option<Instant> = None;
     let mut arm_fail_cooldown_until: Option<Instant> = None;
 
+    // Автокалибровка гироскопа: окно неподвижности и cooldown
+    let mut cal_stable: u32 = 0;
+    let mut cal_accel_min = f32::MAX;
+    let mut cal_accel_max = f32::MIN;
+    let mut cal_cooldown_until: Option<Instant> = None;
+
     let boot = Instant::now();
     let mut ota_confirmed = false;
     let mut last_imu_time = Instant::now();
@@ -269,7 +282,11 @@ fn robot_main() -> anyhow::Result<()> {
                         log::info!("Калибровка гироскопа на ходу — НЕ ДВИГАЙ РОБОТА ~1 с");
                         match imu.calibrate_with_result() {
                             Ok(spread) if spread <= CALIBRATION_MAX_SPREAD_DPS => {
-                                log::info!("Калибровка успешна: offset={:+.3} °/с, spread={:.2} °/с", 
+                                // Привязываем фильтр к акселерометру: старый угол
+                                // мог намотаться от дрейфа до калибровки
+                                filter.reset(data.accel_angle_deg);
+                                filter.reset_bias();
+                                log::info!("Калибровка успешна: offset={:+.3} °/с, spread={:.2} °/с",
                                     imu.offset(), spread);
                             }
                             Ok(spread) => {
@@ -513,6 +530,65 @@ fn robot_main() -> anyhow::Result<()> {
                         tele.reset_blackbox();
 
                         log::info!("БАЛАНС ВКЛ trim={trim:.2}° — ОТПУСКАЙ РУКИ");
+                    }
+
+                    // Автокалибровка гироскопа: робот не в балансе, колёса стоят,
+                    // корпус неподвижен (угол акселерометра стабилен, ~1g), а
+                    // гироскоп упорно показывает скорость — это дрейф нуля.
+                    // Перекалибровываем и привязываем фильтр к акселерометру,
+                    // иначе дрейф наматывает угол (коррекция ограничена 8°/с
+                    // и не пересиливает большой дрейф).
+                    let body_still = (0.85..=1.15).contains(&data.accel_magnitude_g)
+                        && wheel_rate.abs() < 50.0
+                        && gyro.abs() < 30.0;
+                    if body_still {
+                        cal_accel_min = cal_accel_min.min(data.accel_angle_deg);
+                        cal_accel_max = cal_accel_max.max(data.accel_angle_deg);
+                        let accel_stable =
+                            cal_accel_max - cal_accel_min <= AUTOCAL_ACCEL_SPREAD_DEG;
+
+                        if accel_stable && gyro.abs() > AUTOCAL_DRIFT_DPS {
+                            cal_stable = cal_stable.saturating_add(1);
+                        } else {
+                            cal_stable = 0;
+                        }
+                    } else {
+                        cal_stable = 0;
+                        cal_accel_min = f32::MAX;
+                        cal_accel_max = f32::MIN;
+                    }
+
+                    let cal_cooldown_ok = cal_cooldown_until
+                        .map(|t| now >= t)
+                        .unwrap_or(true);
+
+                    if cal_stable >= AUTOCAL_STABLE_CYCLES && cal_cooldown_ok {
+                        log::info!(
+                            "Автокалибровка: гироскоп {gyro:+.2}°/с в покое — калибрую ~1 с"
+                        );
+                        match imu.calibrate_with_result() {
+                            Ok(spread) if spread <= CALIBRATION_MAX_SPREAD_DPS => {
+                                filter.reset(data.accel_angle_deg);
+                                filter.reset_bias();
+                                log::info!(
+                                    "Автокалибровка: offset={:+.3}°/с, разброс {spread:.2}°/с",
+                                    imu.offset()
+                                );
+                            }
+                            Ok(spread) => {
+                                log::warn!(
+                                    "Автокалибровка: шумно (разброс {spread:.2}°/с) — повторю позже"
+                                );
+                            }
+                            Err(e) => {
+                                log::error!("Автокалибровка: ошибка I2C {e:?}");
+                            }
+                        }
+
+                        cal_cooldown_until = Some(Instant::now() + AUTOCAL_COOLDOWN);
+                        cal_stable = 0;
+                        cal_accel_min = f32::MAX;
+                        cal_accel_max = f32::MIN;
                     }
                 }
 
