@@ -110,6 +110,8 @@ declare_params! {
         "Адаптация трима на ходу: постоянный наклон у целевой скорости переучивается в трим (симметрирует тягу). 0 = выкл";
     brake_rate,     "brake_rate",   "×",          1.0,    4.0,     2.5,
         "Торможение быстрее разгона: множитель скорости снижения целевой скорости при сбросе газа";
+    brake_lean,     "brake_lean",   "×",          1.0,    2.0,     1.5,
+        "Тормозной наклон: множитель к drive_lean при отклонении против движения (не выше предельного lean)";
     fall_angle_deg, "fall",         "°",          5.0,    45.0,    22.0,
         "Порог падения: отклонение от целевого угла хода";
     fall_gyro_dps,  "fall_gyro",    "°/с",        50.0,   800.0,   260.0,
@@ -143,6 +145,7 @@ impl Params {
             drive_expo: self.drive_expo,
             trim_adapt_drive: self.trim_adapt_drive,
             brake_rate: self.brake_rate,
+            brake_lean: self.brake_lean,
         }
     }
 }
