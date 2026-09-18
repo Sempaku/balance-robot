@@ -108,6 +108,8 @@ declare_params! {
         "Экспонента газа: 0=линейно, 0.8=макс.чувствительность на малых ходах";
     trim_adapt_drive, "trim_adapt", "°/с/°",      0.0,    1.0,     0.2,
         "Адаптация трима на ходу: постоянный наклон у целевой скорости переучивается в трим (симметрирует тягу). 0 = выкл";
+    brake_rate,     "brake_rate",   "×",          1.0,    4.0,     2.5,
+        "Торможение быстрее разгона: множитель скорости снижения целевой скорости при сбросе газа";
     fall_angle_deg, "fall",         "°",          5.0,    45.0,    22.0,
         "Порог падения: отклонение от целевого угла хода";
     fall_gyro_dps,  "fall_gyro",    "°/с",        50.0,   800.0,   260.0,
@@ -140,6 +142,7 @@ impl Params {
             max_turn_rate: self.max_turn_rate,
             drive_expo: self.drive_expo,
             trim_adapt_drive: self.trim_adapt_drive,
+            brake_rate: self.brake_rate,
         }
     }
 }

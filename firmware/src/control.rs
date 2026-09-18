@@ -55,6 +55,9 @@ pub struct DriveParams {
     /// Скорость адаптации трима на ходу (trim_adapt): °/с на 1° постоянного
     /// наклона. 0 = выключено
     pub trim_adapt_drive: f32,
+    /// Множитель скорости снижения цели при торможении (brake_rate):
+    /// 1 = как разгон, 2.5 = тормозим в 2.5 раза быстрее разгона
+    pub brake_rate: f32,
 }
 
 // Скорость накопления дополнительного наклона при упоре в препятствие (град/сек)
@@ -258,25 +261,34 @@ impl BalanceController {
 
         // 2. S-образный профиль разгона/торможения через управление ускорением.
         //    Используем сигмоидальную функцию для плавного изменения ускорения.
+        //    Торможение (газ сброшен или реверс) — цель снижаем быстрее,
+        //    чем наращиваем: выбег после отпускания стика короче.
+        let braking = commanded_velocity.abs() < self.target_velocity.abs();
+        let slew_rate = if braking {
+            TARGET_SLEW_RATE * dp.brake_rate.max(1.0)
+        } else {
+            TARGET_SLEW_RATE
+        };
+
         let velocity_error = commanded_velocity - self.target_velocity;
         let error_abs = velocity_error.abs();
-        
+
         // Целевое ускорение с S-профилем: чем больше ошибка, тем больше ускорение,
         // но с плавным насыщением по сигмоиде.
         let target_accel_mag = if error_abs < 10.0 {
             // Малая ошибка: линейный режим
-            error_abs * TARGET_SLEW_RATE / 1000.0
+            error_abs * slew_rate / 1000.0
         } else {
             // Большая ошибка: S-образное насыщение
             let normalized_error = error_abs / 1000.0;
             let sigmoid = (S_CURVE_SHAPE * normalized_error).tanh();
-            sigmoid * TARGET_SLEW_RATE
+            sigmoid * slew_rate
         };
-        
+
         // Плавное изменение ускорения (jerk limit)
         let accel_dt = (target_accel_mag - self.target_accel.abs()) * S_CURVE_JERK * dt;
         self.target_accel += accel_dt.signum() * accel_dt.abs().min(S_CURVE_JERK * dt);
-        self.target_accel = self.target_accel.clamp(-TARGET_SLEW_RATE, TARGET_SLEW_RATE);
+        self.target_accel = self.target_accel.clamp(-slew_rate, slew_rate);
         
         // Интегрируем ускорение в скорость
         let max_velocity_step = self.target_accel * dt;
