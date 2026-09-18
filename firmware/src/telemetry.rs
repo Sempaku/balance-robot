@@ -1,6 +1,15 @@
 //! Телеметрия и черный ящик падений.
+//!
+//! Обмен между контуром (ядро 1) и сетевыми задачами (ядро 0) устроен
+//! по схеме seqlock: один разделяемый `Snapshot` в общей памяти.
+//! Писатель (контур, единственный) перед правкой инкрементирует счётчик
+//! последовательности до нечётного, правит структуру, инкрементирует
+//! до чётного. Читатель копирует структуру целиком и проверяет, что
+//! счётчик не изменился, — иначе повторяет. Итог: ни упаковки
+//! f32 → u32 → f32, ни 17 отдельных атомиков, ни разорванных кадров
+//! из разных циклов контура.
 
-use std::sync::atomic::{AtomicI32, AtomicU8, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -90,36 +99,10 @@ impl BlackBox {
     }
 }
 
-pub struct Telemetry {
-    angle: AtomicU32,
-    accel_angle: AtomicU32,
-    gyro: AtomicU32,
-    accel_mag: AtomicU32,
-    gyro_bias: AtomicU32,
-    trim: AtomicU32,
-
-    cmd: AtomicU32,
-    wheel_rate: AtomicU32,
-    term_p: AtomicU32,
-    term_i: AtomicU32,
-    term_d: AtomicU32,
-    steps: AtomicI32,
-
-    state: AtomicU8,
-    imu_errors: AtomicU32,
-
-    dt_us: AtomicU32,
-    max_dt_us: AtomicU32,
-    loop_us: AtomicU32,
-    max_loop_us: AtomicU32,
-
-    event: AtomicU8,
-    event_val: AtomicU32,
-
-    blackbox: Mutex<BlackBox>,
-}
-
+/// Кадр телеметрии: лежит в общей памяти как есть, без упаковки.
+/// Выравнивание 4 байта — все поля f32/i32 читаются атомарно по одному.
 #[derive(Clone, Copy, Default)]
+#[repr(align(4))]
 pub struct Snapshot {
     pub angle: f32,
     pub accel_angle: f32,
@@ -139,99 +122,111 @@ pub struct Snapshot {
     pub loop_us: u16,
 }
 
+pub struct Telemetry {
+    /// Счётчик seqlock: чётный — данные стабильны, нечётный — идёт запись.
+    seq: AtomicU32,
+    /// Разделяемый кадр. Безопасен через seqlock: писатель один (контур),
+    /// читатели копируют структуру только при стабильном счётчике.
+    data: std::cell::UnsafeCell<Snapshot>,
+
+    // Статистика максимумов для логгера (в UDP-пакет не входит)
+    max_dt_us: AtomicU32,
+    max_loop_us: AtomicU32,
+
+    // События: код + значение — дешёвые целочисленные атомики без упаковки
+    event: AtomicU8,
+    event_val: AtomicU32,
+
+    blackbox: Mutex<BlackBox>,
+}
+
+// Безопасность: `data` защищена протоколом seqlock (единственный писатель —
+// контур управления; читатели не трогают данные при нечётном счётчике и
+// перечитывают при его смене). Остальные поля — обычные Sync-типы.
+unsafe impl Sync for Telemetry {}
+
 impl Telemetry {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
-            angle: AtomicU32::new(0),
-            accel_angle: AtomicU32::new(0),
-            gyro: AtomicU32::new(0),
-            accel_mag: AtomicU32::new(0),
-            gyro_bias: AtomicU32::new(0),
-            trim: AtomicU32::new(0),
-            cmd: AtomicU32::new(0),
-            wheel_rate: AtomicU32::new(0),
-            term_p: AtomicU32::new(0),
-            term_i: AtomicU32::new(0),
-            term_d: AtomicU32::new(0),
-            steps: AtomicI32::new(0),
-            state: AtomicU8::new(0),
-            imu_errors: AtomicU32::new(0),
-            dt_us: AtomicU32::new(0),
+            seq: AtomicU32::new(0),
+            data: std::cell::UnsafeCell::new(Snapshot::default()),
             max_dt_us: AtomicU32::new(0),
-            loop_us: AtomicU32::new(0),
             max_loop_us: AtomicU32::new(0),
-            event: AtomicU8::new(0),
+            event: AtomicU8::new(EV_NONE),
             event_val: AtomicU32::new(0),
             blackbox: Mutex::new(BlackBox::new()),
         })
     }
 
+    /// Запись в разделяемый кадр. Вызывается только из контура (один писатель).
+    fn write(&self, f: impl FnOnce(&mut Snapshot)) {
+        self.seq.fetch_add(1, Ordering::AcqRel); // нечётное — читатели ждут
+        let cell = unsafe { &mut *self.data.get() };
+        f(cell);
+        self.seq.fetch_add(1, Ordering::AcqRel); // чётное — кадр опубликован
+    }
+
+    /// Консистентная копия кадра: без упаковки, одним чтением структуры.
     pub fn snapshot(&self) -> Snapshot {
-        Snapshot {
-            angle: Self::unpack(self.angle.load(Ordering::Relaxed)),
-            accel_angle: Self::unpack(self.accel_angle.load(Ordering::Relaxed)),
-            gyro: Self::unpack(self.gyro.load(Ordering::Relaxed)),
-            accel_mag: Self::unpack(self.accel_mag.load(Ordering::Relaxed)),
-            gyro_bias: Self::unpack(self.gyro_bias.load(Ordering::Relaxed)),
-            trim: Self::unpack(self.trim.load(Ordering::Relaxed)),
-            cmd: Self::unpack(self.cmd.load(Ordering::Relaxed)),
-            wheel_rate: Self::unpack(self.wheel_rate.load(Ordering::Relaxed)),
-            term_p: Self::unpack(self.term_p.load(Ordering::Relaxed)),
-            term_lean: Self::unpack(self.term_i.load(Ordering::Relaxed)),
-            term_d: Self::unpack(self.term_d.load(Ordering::Relaxed)),
-            steps: self.steps.load(Ordering::Relaxed),
-            state: self.state.load(Ordering::Relaxed),
-            imu_errors: self.imu_errors.load(Ordering::Relaxed).min(u16::MAX as u32) as u16,
-            dt_us: self.dt_us.load(Ordering::Relaxed).min(u16::MAX as u32) as u16,
-            loop_us: self.loop_us.load(Ordering::Relaxed).min(u16::MAX as u32) as u16,
+        loop {
+            let before = self.seq.load(Ordering::Acquire);
+            if before & 1 == 0 {
+                let copy = unsafe { core::ptr::read_volatile(self.data.get()) };
+                if self.seq.load(Ordering::Acquire) == before {
+                    return copy;
+                }
+            }
+            // Писатель держит кадр или уже перезаписал — повторяем
         }
     }
 
-    fn pack(v: f32) -> u32 {
-        if v.is_finite() { v.to_bits() } else { 0.0f32.to_bits() }
-    }
-
-    fn unpack(v: u32) -> f32 {
-        f32::from_bits(v)
+    fn fin(v: f32) -> f32 {
+        if v.is_finite() { v } else { 0.0 }
     }
 
     pub fn update_imu(&self, angle: f32, gyro: f32, accel_mag: f32, accel_angle: f32) {
-        self.angle.store(Self::pack(angle), Ordering::Relaxed);
-        self.gyro.store(Self::pack(gyro), Ordering::Relaxed);
-        self.accel_mag.store(Self::pack(accel_mag), Ordering::Relaxed);
-        self.accel_angle.store(Self::pack(accel_angle), Ordering::Relaxed);
+        self.write(|s| {
+            s.angle = Self::fin(angle);
+            s.gyro = Self::fin(gyro);
+            s.accel_mag = Self::fin(accel_mag);
+            s.accel_angle = Self::fin(accel_angle);
+        });
     }
 
     pub fn update_control(&self, cmd: f32, wheel_rate: f32, p: f32, i: f32, d: f32, steps: i32) {
-        self.cmd.store(Self::pack(cmd), Ordering::Relaxed);
-        self.wheel_rate.store(Self::pack(wheel_rate), Ordering::Relaxed);
-        self.term_p.store(Self::pack(p), Ordering::Relaxed);
-        self.term_i.store(Self::pack(i), Ordering::Relaxed);
-        self.term_d.store(Self::pack(d), Ordering::Relaxed);
-        self.steps.store(steps, Ordering::Relaxed);
+        self.write(|s| {
+            s.cmd = Self::fin(cmd);
+            s.wheel_rate = Self::fin(wheel_rate);
+            s.term_p = Self::fin(p);
+            s.term_lean = Self::fin(i);
+            s.term_d = Self::fin(d);
+            s.steps = steps;
+        });
     }
 
     pub fn set_gyro_bias(&self, bias: f32) {
-        self.gyro_bias.store(Self::pack(bias), Ordering::Relaxed);
+        self.write(|s| s.gyro_bias = Self::fin(bias));
     }
 
     pub fn set_trim(&self, trim: f32) {
-        self.trim.store(Self::pack(trim), Ordering::Relaxed);
+        self.write(|s| s.trim = Self::fin(trim));
     }
 
     pub fn set_timing(&self, dt_us: u32, loop_us: u32) {
-        self.dt_us.store(dt_us, Ordering::Relaxed);
+        self.write(|s| {
+            s.dt_us = dt_us.min(u16::MAX as u32) as u16;
+            s.loop_us = loop_us.min(u16::MAX as u32) as u16;
+        });
         self.max_dt_us.fetch_max(dt_us, Ordering::Relaxed);
-        self.loop_us.store(loop_us, Ordering::Relaxed);
         self.max_loop_us.fetch_max(loop_us, Ordering::Relaxed);
     }
 
     pub fn set_state(&self, state: u8) {
-        self.state.store(state, Ordering::Relaxed);
+        self.write(|s| s.state = state);
     }
 
     pub fn set_imu_errors(&self, n: u32) {
-        self.imu_errors.store(n, Ordering::Relaxed);
+        self.write(|s| s.imu_errors = n.min(u16::MAX as u32) as u16);
     }
 
     pub fn send_event(&self, event: u8, val: f32) {
@@ -309,36 +304,19 @@ unsafe extern "C" fn logger_entry(ctx: *mut core::ffi::c_void) {
         FreeRtos::delay_ms(period_ms);
 
         let t = t0.elapsed().as_secs_f32();
-        let state = tele.state.load(Ordering::Relaxed);
-        let state_str = if state == STATE_BALANCING { "BAL " } else { "IDLE" };
+        let s = tele.snapshot();
+        let state_str = if s.state == STATE_BALANCING { "BAL " } else { "IDLE" };
 
-        let angle = Telemetry::unpack(tele.angle.load(Ordering::Relaxed));
-        let accel_angle = Telemetry::unpack(tele.accel_angle.load(Ordering::Relaxed));
-        let gyro = Telemetry::unpack(tele.gyro.load(Ordering::Relaxed));
-        let mag = Telemetry::unpack(tele.accel_mag.load(Ordering::Relaxed));
-        let bias = Telemetry::unpack(tele.gyro_bias.load(Ordering::Relaxed));
-        let trim = Telemetry::unpack(tele.trim.load(Ordering::Relaxed));
-
-        let cmd = Telemetry::unpack(tele.cmd.load(Ordering::Relaxed));
-        let wheel_rate = Telemetry::unpack(tele.wheel_rate.load(Ordering::Relaxed));
-        let p = Telemetry::unpack(tele.term_p.load(Ordering::Relaxed));
-        let i = Telemetry::unpack(tele.term_i.load(Ordering::Relaxed));
-        let d = Telemetry::unpack(tele.term_d.load(Ordering::Relaxed));
-        let steps = tele.steps.load(Ordering::Relaxed);
-
-        let dt_us = tele.dt_us.load(Ordering::Relaxed);
         let max_dt_us = tele.max_dt_us.swap(0, Ordering::Relaxed);
-        let loop_us = tele.loop_us.load(Ordering::Relaxed);
         let max_loop_us = tele.max_loop_us.swap(0, Ordering::Relaxed);
-        let imu_errors = tele.imu_errors.load(Ordering::Relaxed);
 
         log::info!(
             "[{:6.1}s] {} A={:+.2}(acc{:+.2}) G={:+.1} B={:+.2} T={:+.2} M={:.2} | CMD={:+.0} W={:+.0} S={} | P={:+.0} lean={:+.2} D={:+.0} | dt={}({})us L={}({})us IE={}",
-            t, state_str, angle, accel_angle, gyro, bias, trim, mag,
-            cmd, wheel_rate, steps,
-            p, i, d,
-            dt_us, max_dt_us, loop_us, max_loop_us,
-            imu_errors
+            t, state_str, s.angle, s.accel_angle, s.gyro, s.gyro_bias, s.trim, s.accel_mag,
+            s.cmd, s.wheel_rate, s.steps,
+            s.term_p, s.term_lean, s.term_d,
+            s.dt_us, max_dt_us, s.loop_us, max_loop_us,
+            s.imu_errors
         );
 
         let ev = tele.event.swap(EV_NONE, Ordering::Relaxed);
