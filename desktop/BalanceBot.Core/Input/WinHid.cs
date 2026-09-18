@@ -1,0 +1,166 @@
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+namespace BalanceBot.Core.Input;
+
+/// <summary>
+/// Минимальная обёртка над Win32 HID: перечисление устройств по VID/PID,
+/// синхронное чтение input-отчётов, запись output-отчётов и feature-запросы.
+/// Без внешних зависимостей — только P/Invoke.
+/// </summary>
+internal static class WinHid
+{
+    private static readonly Guid HidGuid = new("4d1e55b2-f16f-11cf-88cb-001111000030");
+
+    private const uint DigcfPresent = 0x02;
+    private const uint DigcfDeviceInterface = 0x01;
+
+    private const uint GenericRead = 0x80000000;
+    private const uint GenericWrite = 0x40000000;
+    private const uint FileShareRead = 0x00000001;
+    private const uint FileShareWrite = 0x00000002;
+    private const uint OpenExisting = 3;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SpDeviceInterfaceData
+    {
+        public int CbSize;
+        public Guid InterfaceClassGuid;
+        public uint Flags;
+        public IntPtr Reserved;
+    }
+
+    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr SetupDiGetClassDevs(ref Guid classGuid, IntPtr enumerator, IntPtr hwndParent, uint flags);
+
+    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool SetupDiEnumDeviceInterfaces(IntPtr infoSet, IntPtr infoData, ref Guid interfaceGuid, uint index, ref SpDeviceInterfaceData data);
+
+    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr infoSet, ref SpDeviceInterfaceData data, IntPtr detailData, uint detailSize, ref uint requiredSize, IntPtr deviceInfoData);
+
+    [DllImport("setupapi.dll", SetLastError = true)]
+    private static extern bool SetupDiDestroyDeviceInfoList(IntPtr infoSet);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFile(string fileName, uint desiredAccess, uint shareMode, IntPtr securityAttributes, uint creationDisposition, uint flagsAndAttributes, IntPtr templateFile);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool ReadFile(SafeFileHandle file, byte[] buffer, uint bytesToRead, out uint bytesRead, IntPtr overlapped);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool WriteFile(SafeFileHandle file, byte[] buffer, uint bytesToWrite, out uint bytesWritten, IntPtr overlapped);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CancelIoEx(SafeFileHandle file, IntPtr overlapped);
+
+    [DllImport("hid.dll", SetLastError = true)]
+    private static extern bool HidD_GetFeature(SafeFileHandle file, byte[] reportBuffer, uint reportBufferLength);
+
+    /// <summary>
+    /// Пути HID-устройств с заданным VID/PID (присутствующих в системе).
+    /// </summary>
+    public static List<string> EnumeratePaths(ushort vid, ushort pid)
+    {
+        var result = new List<string>();
+        var guid = HidGuid;
+        IntPtr infoSet = SetupDiGetClassDevs(ref guid, IntPtr.Zero, IntPtr.Zero, DigcfPresent | DigcfDeviceInterface);
+        if (infoSet == IntPtr.Zero || infoSet == new IntPtr(-1))
+        {
+            return result;
+        }
+
+        try
+        {
+            var data = new SpDeviceInterfaceData { CbSize = Marshal.SizeOf<SpDeviceInterfaceData>() };
+            uint index = 0;
+            while (SetupDiEnumDeviceInterfaces(infoSet, IntPtr.Zero, ref guid, index++, ref data))
+            {
+                uint required = 0;
+                SetupDiGetDeviceInterfaceDetail(infoSet, ref data, IntPtr.Zero, 0, ref required, IntPtr.Zero);
+                if (required == 0)
+                {
+                    continue;
+                }
+
+                IntPtr buffer = Marshal.AllocHGlobal((int)required);
+                try
+                {
+                    int cbSize = IntPtr.Size == 8 ? 8 : 6; // SP_DEVICE_INTERFACE_DETAIL_DATA.cbSize
+                    Marshal.WriteInt32(buffer, cbSize);
+                    if (SetupDiGetDeviceInterfaceDetail(infoSet, ref data, buffer, required, ref required, IntPtr.Zero))
+                    {
+                        string path = Marshal.PtrToStringUni(buffer + cbSize) ?? string.Empty;
+                        if (path.Contains($"vid_{vid:x4}&pid_{pid:x4}", StringComparison.OrdinalIgnoreCase))
+                        {
+                            result.Add(path);
+                        }
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(buffer);
+                }
+            }
+        }
+        finally
+        {
+            SetupDiDestroyDeviceInfoList(infoSet);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Открытие устройства. При writeAccess=true запрашивается доступ на запись
+    /// (нужен для output-отчётов: вибрация, lightbar).
+    /// </summary>
+    public static SafeFileHandle Open(string path, bool writeAccess)
+    {
+        uint access = GenericRead | (writeAccess ? GenericWrite : 0u);
+        return CreateFile(path, access, FileShareRead | FileShareWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+    }
+
+    /// <summary>
+    /// Блокирующее чтение одного input-отчёта (report ID в первом байте).
+    /// false — устройство отключено или чтение отменено через CancelIoEx.
+    /// </summary>
+    public static bool Read(SafeFileHandle file, byte[] buffer, out int bytesRead)
+    {
+        bool ok = ReadFile(file, buffer, (uint)buffer.Length, out uint n, IntPtr.Zero);
+        bytesRead = (int)n;
+        return ok;
+    }
+
+    /// <summary>
+    /// Запись output-отчёта (report ID в первом байте).
+    /// </summary>
+    public static bool Write(SafeFileHandle file, byte[] report)
+    {
+        return WriteFile(file, report, (uint)report.Length, out _, IntPtr.Zero);
+    }
+
+    /// <summary>
+    /// Feature-запрос (чтение). buffer[0] = report ID.
+    /// </summary>
+    public static bool TryGetFeature(SafeFileHandle file, byte reportId, byte[] buffer)
+    {
+        buffer[0] = reportId;
+        Array.Clear(buffer, 1, buffer.Length - 1);
+        return HidD_GetFeature(file, buffer, (uint)buffer.Length);
+    }
+
+    /// <summary>
+    /// Отмена незавершённых операций ввода-вывода (разблокирует Read из другого потока).
+    /// </summary>
+    public static void CancelIo(SafeFileHandle file)
+    {
+        try
+        {
+            CancelIoEx(file, IntPtr.Zero);
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+}

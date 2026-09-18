@@ -107,6 +107,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             if (CurrentSession != null)
             {
+                Control?.Dispose();
                 Dashboard?.Dispose();
                 await CurrentSession.DisposeAsync();
             }
