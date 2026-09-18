@@ -47,7 +47,7 @@ pub fn request_autotune() {
     AUTOTUNE_REQUEST.store(true, Ordering::Relaxed);
 }
 
-use control::{BalanceController, MOTOR_SIGN};
+use control::{BalanceController, FallDetector, MOTOR_SIGN};
 use filter::ComplementaryFilter;
 use mpu6050::{Mpu6050, CALIBRATION_MAX_SPREAD_DPS};
 use net::{NetStatus, PORT_COMMAND, PORT_TELEMETRY, http_api::HTTP_PORT};
@@ -56,7 +56,10 @@ use remote::RemoteState;
 use signcheck::GyroSignCheck;
 use stepper::{StepperEngine, StepperMotor, MAX_STEP_RATE, MICROSTEPS};
 use storage::Storage;
-use telemetry::{BlackBoxFrame, Telemetry, EV_ARMED, EV_FALL, EV_IMU_DEAD, STATE_BALANCING, STATE_IDLE};
+use telemetry::{
+    BlackBoxFrame, Telemetry, EV_ARMED, EV_ARM_FAIL, EV_FALL, EV_IMU_DEAD, EV_STABILITY_WARN,
+    STATE_BALANCING, STATE_IDLE,
+};
 use autotune::RelayTuner;
 
 const TELEMETRY_PERIOD: Duration = Duration::from_millis(200);
@@ -178,6 +181,7 @@ fn robot_main() -> anyhow::Result<()> {
     let mut tunables = params.snapshot();
     let mut filter = ComplementaryFilter::new(tunables.filter_tau);
     let mut ctrl = BalanceController::new(tunables.gains());
+    let mut fall_detector = FallDetector::new();
     let mut sign_check = GyroSignCheck::new();
     let mut led = PinDriver::output(peripherals.pins.gpio2)?;
     led.set_low()?;
@@ -370,9 +374,10 @@ fn robot_main() -> anyhow::Result<()> {
                             // Ещё в окне проверки
                             if angle.abs() > ARM_FAIL_MAX_ANGLE || gyro.abs() > ARM_FAIL_MAX_GYRO {
                                 log::warn!("УБЕГАНИЕ при арминге: A={angle:.1}° G={gyro:.0} — СТОП");
-                                tele.send_event(4, angle); // EV_ARM_FAIL
+                                tele.send_event(EV_ARM_FAIL, angle);
                                 arm_fail_cooldown_until = Some(Instant::now() + Duration::from_millis(ARM_FAIL_COOLDOWN_MS as u64));
                                 arm_fail_timer = None;
+                                fall_detector.reset();
                                 disarm(
                                     &mut is_balancing,
                                     &mut ctrl,
@@ -392,16 +397,35 @@ fn robot_main() -> anyhow::Result<()> {
 
                     // Ошибка слежения с учетом наклона хода (устраняет ложное падение)
                     let tracking_err = ctrl.tracking_error(angle);
-                    
-                    let falling = tracking_err.abs() > tunables.fall_angle_deg
-                        || angle.abs() > 35.0
-                        || (tracking_err.abs() > 12.0 && gyro.abs() > tunables.fall_gyro_dps);
 
-                    if falling || stop_requested {
+                    // Улучшенный детектор падения: окно 5 измерений, тренд
+                    // ошибки, асимметричные пороги вперёд/назад
+                    let verdict = fall_detector.update(
+                        tracking_err,
+                        angle,
+                        gyro,
+                        dt,
+                        tunables.fall_angle_deg,
+                        tunables.fall_gyro_dps,
+                    );
+
+                    // Предупреждение о потере устойчивости — до падения
+                    if verdict.warning {
+                        log::warn!(
+                            "ПОТЕРЯ УСТОЙЧИВОСТИ: e={tracking_err:.1}° тренд={:+.0}°/с — близко к падению",
+                            verdict.trend_dps
+                        );
+                        tele.send_event(EV_STABILITY_WARN, tracking_err);
+                    }
+
+                    if verdict.falling || stop_requested {
                         if stop_requested {
                             log::warn!("СТОП по команде из UI");
                         } else {
-                            log::warn!("УПАЛ e={tracking_err:.1}° A={angle:.1}° G={gyro:.0} — СТОП");
+                            log::warn!(
+                                "УПАЛ e={tracking_err:.1}° A={angle:.1}° G={gyro:.0} тренд={:+.0}°/с — СТОП",
+                                verdict.trend_dps
+                            );
                         }
                         tele.send_event(EV_FALL, tracking_err);
                         tele.freeze_blackbox();
@@ -410,6 +434,7 @@ fn robot_main() -> anyhow::Result<()> {
                         filter.reset(data.accel_angle_deg);
                         filter.reset_bias();
 
+                        fall_detector.reset();
                         disarm(
                             &mut is_balancing,
                             &mut ctrl,
@@ -446,8 +471,9 @@ fn robot_main() -> anyhow::Result<()> {
                         tele.update_control(base_cmd, wheel_rate, p, i, d, steps_now);
                         tele.set_state(STATE_BALANCING);
 
-                        // Флаги состояния: бит 0 = баланс, бит 1 = препятствие
-                        let flags = if is_balancing { 1u8 } else { 0u8 };
+                        // Флаги состояния: бит 0 = баланс, бит 1 = препятствие,
+                        // бит 2 = потеря устойчивости (предупреждение детектора)
+                        let flags = 1u8 | if verdict.unstable { 4 } else { 0 };
                         
                         tele.record_blackbox(BlackBoxFrame {
                             t_ms: uptime_ms,
@@ -528,6 +554,7 @@ fn robot_main() -> anyhow::Result<()> {
                         tele.set_state(STATE_BALANCING);
                         tele.send_event(EV_ARMED, trim);
                         tele.reset_blackbox();
+                        fall_detector.reset();
 
                         log::info!("БАЛАНС ВКЛ trim={trim:.2}° — ОТПУСКАЙ РУКИ");
                     }
@@ -602,6 +629,7 @@ fn robot_main() -> anyhow::Result<()> {
                 if imu_errors >= MAX_IMU_ERRORS {
                     tele.send_event(EV_IMU_DEAD, 0.0);
                     tele.freeze_blackbox();
+                    fall_detector.reset();
                     disarm(
                         &mut is_balancing,
                         &mut ctrl,

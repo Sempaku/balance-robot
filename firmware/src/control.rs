@@ -43,6 +43,34 @@ const OBSTACLE_ENGAGE_ERROR: f32 = 3500.0;
 const OBSTACLE_BOOST_RATE: f32 = 6.0;
 const MAX_BOOST_LEAN: f32 = 4.0;
 
+// === Улучшенный детектор падения ===
+
+/// Скользящее окно детектора: последние N ошибок слежения
+/// (5 сэмплов ≈ 25 мс при 200 Гц).
+const FALL_WINDOW: usize = 5;
+
+/// Порог тренда (°/с) для предупреждения о потере устойчивости.
+const STABILITY_WARN_TREND_DPS: f32 = 20.0;
+/// Доля порога падения, с которой включается предупреждение.
+const STABILITY_WARN_ENGAGE: f32 = 0.6;
+/// Средний модуль ошибки по окну (доля порога) для предупреждения.
+const STABILITY_WARN_MEAN: f32 = 0.75;
+/// Ошибка ниже этой доли порога — устойчивость восстановлена.
+const STABILITY_WARN_CLEAR: f32 = 0.3;
+
+/// Порог тренда (°/с) для аварийного стопа: быстрое падение ловим
+/// до выхода ошибки за порог.
+const FALL_TREND_DPS: f32 = 60.0;
+/// Доля порога падения, с которой включается анализ тренда на стоп.
+const FALL_TREND_ENGAGE: f32 = 0.5;
+/// Подтверждение тренда: столько подряд циклов (по 5 мс) — стоп.
+const FALL_TREND_CONFIRM: u16 = 3;
+
+/// Масштаб порога при падении вперёд (положительная ошибка слежения).
+const FALL_FWD_SCALE: f32 = 1.0;
+/// Масштаб порога при падении назад: назад опаснее — детектируем раньше.
+const FALL_BACK_SCALE: f32 = 0.9;
+
 #[derive(Clone, Copy)]
 pub struct Gains {
     pub ka_angle: f32,
@@ -333,5 +361,156 @@ impl BalanceController {
             self.trim_base - TRIM_MAX_DRIFT_DEG,
             self.trim_base + TRIM_MAX_DRIFT_DEG,
         );
+    }
+}
+
+/// Вердикт улучшенного детектора падения.
+#[derive(Clone, Copy, Default)]
+pub struct FallVerdict {
+    /// Аварийный стоп: робот падает.
+    pub falling: bool,
+    /// Предупреждение о потере устойчивости (фронт: сработало в этом цикле).
+    pub warning: bool,
+    /// Потеря устойчивости активна (устойчивое состояние, для флагов).
+    pub unstable: bool,
+    /// Тренд ошибки слежения (°/с) — для логов и отладки.
+    pub trend_dps: f32,
+}
+
+/// Улучшенный детектор падения: скользящее окно последних измерений,
+/// тренд ошибки слежения (МНК-наклон по окну) и асимметричные пороги
+/// вперёд/назад. Предупреждает о потере устойчивости до срабатывания
+/// аварийного стопа.
+pub struct FallDetector {
+    errs: [f32; FALL_WINDOW],
+    count: usize,
+    head: usize,
+    warned: bool,
+    trend_streak: u16,
+    trend_dps: f32,
+}
+
+impl FallDetector {
+    pub fn new() -> Self {
+        Self {
+            errs: [0.0; FALL_WINDOW],
+            count: 0,
+            head: 0,
+            warned: false,
+            trend_streak: 0,
+            trend_dps: 0.0,
+        }
+    }
+
+    /// Сброс окна и состояния — при арминге и после стопа.
+    pub fn reset(&mut self) {
+        *self = Self::new();
+    }
+
+    /// Один шаг детектора (вызывается каждый цикл контура, 200 Гц).
+    pub fn update(
+        &mut self,
+        tracking_err: f32,
+        angle_deg: f32,
+        gyro_dps: f32,
+        dt: f32,
+        fall_angle_deg: f32,
+        fall_gyro_dps: f32,
+    ) -> FallVerdict {
+        // Скользящее окно последних измерений ошибки слежения
+        self.errs[self.head] = tracking_err;
+        self.head = (self.head + 1) % FALL_WINDOW;
+        if self.count < FALL_WINDOW {
+            self.count += 1;
+        }
+
+        // Тренд: наклон ошибки слежения по окну (МНК), в °/с
+        self.trend_dps = if self.count == FALL_WINDOW && dt > 0.0 {
+            self.slope(dt)
+        } else {
+            0.0
+        };
+
+        // Асимметричный порог: падение назад опаснее — режем раньше
+        let threshold = fall_angle_deg
+            * if tracking_err < 0.0 {
+                FALL_BACK_SCALE
+            } else {
+                FALL_FWD_SCALE
+            };
+        let err_abs = tracking_err.abs();
+
+        // Жёсткие условия (как прежде, но с асимметрией порога)
+        let hard_fall = err_abs > threshold
+            || angle_deg.abs() > 35.0
+            || (err_abs > 12.0 && gyro_dps.abs() > fall_gyro_dps);
+
+        // Трендовое условие: ошибка уже велика и быстро растёт —
+        // падение ловим до выхода за порог, с подтверждением по времени
+        let trending =
+            err_abs > threshold * FALL_TREND_ENGAGE && self.trend_dps.abs() > FALL_TREND_DPS;
+        self.trend_streak = if trending {
+            self.trend_streak.saturating_add(1)
+        } else {
+            0
+        };
+
+        let falling = hard_fall || self.trend_streak >= FALL_TREND_CONFIRM;
+
+        // Предупреждение о потере устойчивости — до падения:
+        // ошибка у порога и растёт, либо держится у порога по окну
+        let near_limit = err_abs > threshold * STABILITY_WARN_ENGAGE;
+        let drifting = self.trend_dps.abs() > STABILITY_WARN_TREND_DPS;
+        let sustained = self.mean_abs() > threshold * STABILITY_WARN_MEAN;
+        let mut warning = false;
+        if near_limit && (drifting || sustained) {
+            if !self.warned {
+                self.warned = true;
+                warning = true;
+            }
+        } else if err_abs < threshold * STABILITY_WARN_CLEAR {
+            self.warned = false;
+        }
+
+        FallVerdict {
+            falling,
+            warning,
+            unstable: self.warned,
+            trend_dps: self.trend_dps,
+        }
+    }
+
+    /// Наклон МНК по окну в хронологическом порядке (head — старейший сэмпл).
+    fn slope(&self, dt: f32) -> f32 {
+        let n = FALL_WINDOW as f32;
+        let mut sx = 0.0;
+        let mut sy = 0.0;
+        let mut sxy = 0.0;
+        let mut sxx = 0.0;
+        for i in 0..FALL_WINDOW {
+            let x = i as f32;
+            let y = self.errs[(self.head + i) % FALL_WINDOW];
+            sx += x;
+            sy += y;
+            sxy += x * y;
+            sxx += x * x;
+        }
+        let denom = n * sxx - sx * sx;
+        if denom.abs() < f32::EPSILON {
+            return 0.0;
+        }
+        ((n * sxy - sx * sy) / denom) / dt
+    }
+
+    /// Средний модуль ошибки по заполненной части окна.
+    fn mean_abs(&self) -> f32 {
+        let n = self.count.max(1) as f32;
+        self.errs.iter().take(self.count).map(|v| v.abs()).sum::<f32>() / n
+    }
+}
+
+impl Default for FallDetector {
+    fn default() -> Self {
+        Self::new()
     }
 }

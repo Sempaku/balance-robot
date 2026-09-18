@@ -23,6 +23,8 @@ pub const EV_NONE: u8 = 0;
 pub const EV_ARMED: u8 = 1;
 pub const EV_FALL: u8 = 2;
 pub const EV_IMU_DEAD: u8 = 3;
+pub const EV_ARM_FAIL: u8 = 4;
+pub const EV_STABILITY_WARN: u8 = 7;
 
 const LOGGER_STACK: u32 = 4096;
 const LOGGER_PRIORITY: u32 = 2;
@@ -326,6 +328,10 @@ unsafe extern "C" fn logger_entry(ctx: *mut core::ffi::c_void) {
                 EV_ARMED => log::info!(">>> БАЛАНС ВКЛ (угол {:+.2}°)", raw),
                 EV_FALL => log::warn!(">>> ПАДЕНИЕ (угол {:+.2}°) — чёрный ящик сохранён", raw),
                 EV_IMU_DEAD => log::error!(">>> MPU6050 НЕ ОТВЕЧАЕТ — СТОП"),
+                EV_ARM_FAIL => log::warn!(">>> НЕУДАЧНЫЙ АРМИНГ (угол {:+.2}°) — стоп", raw),
+                EV_STABILITY_WARN => {
+                    log::warn!(">>> ПОТЕРЯ УСТОЙЧИВОСТИ (ошибка {:+.2}°) — близко к падению", raw)
+                }
                 _ => {}
             }
         }
