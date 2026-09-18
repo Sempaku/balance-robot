@@ -39,6 +39,24 @@ const S_CURVE_SHAPE: f32 = 1.5;
 /// упоре в препятствие, а не на каждом старте.
 const OBSTACLE_ENGAGE_ERROR: f32 = 3500.0;
 
+/// Адаптация трима на ходу работает только у целевой скорости:
+/// ближе этого недобора (шаг/с) — переучиваем трим, дальше — не мешаем разгону.
+const DRIVE_TRIM_ADAPT_ERR: f32 = 500.0;
+
+/// Настройки контура хода (передаются в update() каждый цикл из реестра параметров).
+#[derive(Clone, Copy)]
+pub struct DriveParams {
+    /// Предельный наклон хода (drive_lean)
+    pub max_drive_lean_deg: f32,
+    /// Скорость разворота при полном стике (turn_rate)
+    pub max_turn_rate: f32,
+    /// Экспонента газа (expo)
+    pub drive_expo: f32,
+    /// Скорость адаптации трима на ходу (trim_adapt): °/с на 1° постоянного
+    /// наклона. 0 = выключено
+    pub trim_adapt_drive: f32,
+}
+
 // Скорость накопления дополнительного наклона при упоре в препятствие (град/сек)
 const OBSTACLE_BOOST_RATE: f32 = 6.0;
 const MAX_BOOST_LEAN: f32 = 4.0;
@@ -203,9 +221,7 @@ impl BalanceController {
         drive_forward: f32,
         drive_turn: f32,
         trim_offset: f32,
-        max_drive_lean_deg: f32,
-        max_turn_rate: f32,
-        drive_expo: f32,
+        dp: DriveParams,
         dt: f32,
     ) -> (f32, f32) {
         if !dt.is_finite() || dt <= 0.0 {
@@ -219,8 +235,8 @@ impl BalanceController {
         let is_driving = drive_forward.abs() > 0.03;
 
         // Экспоненциальная кривая газа: sign(x) * |x|^expo
-        let drive_forward = if is_driving && drive_expo > 0.0 {
-            let expo = drive_expo.clamp(0.0, 0.8);
+        let drive_forward = if is_driving && dp.drive_expo > 0.0 {
+            let expo = dp.drive_expo.clamp(0.0, 0.8);
             let sign = drive_forward.signum();
             let abs = drive_forward.abs();
             sign * abs.powf(1.0 - expo)
@@ -271,7 +287,21 @@ impl BalanceController {
         //    (Прежняя формула kv·(факт − цель) была положительной обратной
         //    связью: робот разгонялся прочь от цели и не реагировал на реверс.)
         let speed_error = self.target_velocity - wheel_rate_logical;
-        let base_lean = (g.kd_vel * speed_error).clamp(-max_drive_lean_deg, max_drive_lean_deg);
+        let base_lean = (g.kd_vel * speed_error)
+            .clamp(-dp.max_drive_lean_deg, dp.max_drive_lean_deg);
+
+        // Адаптация трима на ходу: у целевой скорости постоянная составляющая
+        // наклона (борьба с уклоном или смещённым при арминге равновесием)
+        // медленно переучивается в трим — бюджет наклона центрируется,
+        // тяга становится симметричной в обе стороны. Как adapt_trim в покое,
+        // но по скорости и только у цели, чтобы не мешать разгону.
+        if dp.trim_adapt_drive > 0.0 && speed_error.abs() < DRIVE_TRIM_ADAPT_ERR {
+            self.angle_trim += base_lean * dp.trim_adapt_drive * dt;
+            self.angle_trim = self.angle_trim.clamp(
+                self.trim_base - TRIM_MAX_DRIFT_DEG,
+                self.trim_base + TRIM_MAX_DRIFT_DEG,
+            );
+        }
 
         // 4. Интегратор препятствий: колёса упёрлись и не догоняют цель —
         //    дожимаем корпус в ту же сторону, куда хотим ехать.
@@ -342,7 +372,7 @@ impl BalanceController {
         self.last_cmd = base_cmd;
 
         // Поворот вокруг вертикальной оси
-        let turn_offset = drive_turn * max_turn_rate;
+        let turn_offset = drive_turn * dp.max_turn_rate;
         let left_cmd = (base_cmd - turn_offset).clamp(-MAX_STEP_RATE, MAX_STEP_RATE);
         let right_cmd = (base_cmd + turn_offset).clamp(-MAX_STEP_RATE, MAX_STEP_RATE);
 

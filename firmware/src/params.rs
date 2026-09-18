@@ -3,7 +3,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use crate::control::Gains;
+use crate::control::{DriveParams, Gains};
 
 pub struct ParamInfo {
     pub key: &'static str,
@@ -106,6 +106,8 @@ declare_params! {
         "Скорость разворота при полном отклонении стика вбок";
     drive_expo,     "expo",         "",           0.0,    0.8,     0.0,
         "Экспонента газа: 0=линейно, 0.8=макс.чувствительность на малых ходах";
+    trim_adapt_drive, "trim_adapt", "°/с/°",      0.0,    1.0,     0.2,
+        "Адаптация трима на ходу: постоянный наклон у целевой скорости переучивается в трим (симметрирует тягу). 0 = выкл";
     fall_angle_deg, "fall",         "°",          5.0,    45.0,    22.0,
         "Порог падения: отклонение от целевого угла хода";
     fall_gyro_dps,  "fall_gyro",    "°/с",        50.0,   800.0,   260.0,
@@ -129,6 +131,15 @@ impl Params {
             kp_pos: self.kp_pos,
             kd_vel: self.kd_vel,
             max_lean_deg: self.max_lean_deg,
+        }
+    }
+
+    pub fn drive_params(&self) -> DriveParams {
+        DriveParams {
+            max_drive_lean_deg: self.max_drive_lean,
+            max_turn_rate: self.max_turn_rate,
+            drive_expo: self.drive_expo,
+            trim_adapt_drive: self.trim_adapt_drive,
         }
     }
 }
