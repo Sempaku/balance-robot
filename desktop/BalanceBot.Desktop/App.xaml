@@ -3,17 +3,17 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-        <!-- Цветовая палитра темы -->
-        <Color x:Key="BgDarkColor">#12141A</Color>
-        <Color x:Key="BgCardColor">#1B1F28</Color>
-        <Color x:Key="BgCardHoverColor">#222733</Color>
-        <Color x:Key="BorderColor">#2D3342</Color>
-        <Color x:Key="AccentColor">#3D7EFF</Color>
-        <Color x:Key="SuccessColor">#00E676</Color>
-        <Color x:Key="DangerColor">#FF334B</Color>
-        <Color x:Key="WarningColor">#FFB300</Color>
-        <Color x:Key="TextPrimaryColor">#E8EAF0</Color>
-        <Color x:Key="TextSecondaryColor">#8B93A7</Color>
+        <!-- ===== Цветовая палитра темы ===== -->
+        <Color x:Key="BgDarkColor">#0D0F14</Color>
+        <Color x:Key="BgCardColor">#161A22</Color>
+        <Color x:Key="BgCardHoverColor">#1E232E</Color>
+        <Color x:Key="BorderColor">#2A3040</Color>
+        <Color x:Key="AccentColor">#4A90FF</Color>
+        <Color x:Key="SuccessColor">#00D084</Color>
+        <Color x:Key="DangerColor">#FF4757</Color>
+        <Color x:Key="WarningColor">#FFA502</Color>
+        <Color x:Key="TextPrimaryColor">#E8ECF1</Color>
+        <Color x:Key="TextSecondaryColor">#8B95A5</Color>
 
         <SolidColorBrush x:Key="BgDarkBrush" Color="{StaticResource BgDarkColor}" />
         <SolidColorBrush x:Key="BgCardBrush" Color="{StaticResource BgCardColor}" />
@@ -26,31 +26,57 @@
         <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
         <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
 
+        <!-- ===== Размеры шрифтов ===== -->
+        <sys:Double x:Key="FontSizeCaption" xmlns:sys="clr-namespace:System;assembly=mscorlib">11</sys:Double>
+        <sys:Double x:Key="FontSizeBody" xmlns:sys="clr-namespace:System;assembly=mscorlib">13</sys:Double>
+        <sys:Double x:Key="FontSizeTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">15</sys:Double>
+        <sys:Double x:Key="FontSizeHeadline" xmlns:sys="clr-namespace:System;assembly=mscorlib">20</sys:Double>
+
+        <!-- ===== Скругления ===== -->
+        <CornerRadius x:Key="CornerRadiusSmall">6</CornerRadius>
+        <CornerRadius x:Key="CornerRadiusMedium">10</CornerRadius>
+
+        <!-- ===== Отступы ===== -->
+        <Thickness x:Key="SpacingSmall">8</Thickness>
+        <Thickness x:Key="SpacingMedium">16</Thickness>
+
+        <!-- ===== Базовые стили ===== -->
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="FontFamily" Value="Segoe UI, Segoe UI Variable Display" />
+            <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI, sans-serif" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
         </Style>
 
+        <Style TargetType="UserControl">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI, sans-serif" />
+        </Style>
+
+        <!-- ===== CardPanel ===== -->
         <Style x:Key="CardPanel" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource BgCardBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Padding" Value="16" />
+            <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}" />
+            <Setter Property="Padding" Value="{StaticResource SpacingMedium}" />
         </Style>
 
+        <!-- ===== ModernButton ===== -->
         <Style x:Key="ModernButton" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource AccentBrush}" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
             <Setter Property="Padding" Value="16,8" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{StaticResource CornerRadiusSmall}"
+                                Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -71,13 +97,13 @@
 
         <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
             <Setter Property="Background" Value="{StaticResource DangerBrush}" />
-            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
 
         <Style x:Key="SuccessButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
             <Setter Property="Background" Value="{StaticResource SuccessBrush}" />
-            <Setter Property="Foreground" Value="#12141A" />
+            <Setter Property="Foreground" Value="{StaticResource BgDarkBrush}" />
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
 
@@ -86,17 +112,21 @@
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         </Style>
 
+        <!-- ===== ModernTextBox ===== -->
         <Style x:Key="ModernTextBox" TargetType="TextBox">
-            <Setter Property="Background" Value="#151821" />
+            <Setter Property="Background" Value="{StaticResource BgDarkBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="10,6" />
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{StaticResource CornerRadiusSmall}">
                             <ScrollViewer x:Name="PART_ContentHost" Margin="2" />
                         </Border>
                     </ControlTemplate>
@@ -104,9 +134,9 @@
             </Setter>
         </Style>
 
-        <!-- Тёмный стиль для элементов списка ComboBox -->
+        <!-- ===== ComboBoxItem ===== -->
         <Style TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="#1B1F28" />
+            <Setter Property="Background" Value="{StaticResource BgCardBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="Padding" Value="10,8" />
             <Setter Property="BorderThickness" Value="0" />
@@ -129,30 +159,38 @@
             </Setter>
         </Style>
 
-        <!-- Тёмный стиль самого выпадающего списка ComboBox -->
+        <!-- ===== ComboBox ===== -->
         <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="#151821" />
+            <Setter Property="Background" Value="{StaticResource BgDarkBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="8,4" />
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
         </Style>
 
+        <!-- ===== TabControl ===== -->
         <Style TargetType="TabControl">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
 
+        <!-- ===== TabItem ===== -->
         <Style TargetType="TabItem">
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Padding" Value="18,10" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
-                        <Border x:Name="border" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="Transparent" Margin="0,0,10,0" Padding="{TemplateBinding Padding}" Cursor="Hand">
+                        <Border x:Name="border"
+                                Background="Transparent"
+                                BorderThickness="0,0,0,2"
+                                BorderBrush="Transparent"
+                                Margin="0,0,10,0"
+                                Padding="{TemplateBinding Padding}"
+                                Cursor="Hand">
                             <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -167,6 +205,12 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- ===== ScrollBar ===== -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Width" Value="8" />
         </Style>
     </Application.Resources>
 </Application>

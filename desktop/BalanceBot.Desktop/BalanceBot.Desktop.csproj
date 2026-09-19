@@ -20,9 +20,4 @@
 		<ProjectReference Include="..\BalanceBot.Transport\BalanceBot.Transport.csproj" />
 	</ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Views\" />
-    <Folder Include="Controls\" />
-  </ItemGroup>
-
 </Project>

@@ -4,6 +4,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using BalanceBot.Core.Analysis;
 using BalanceBot.Desktop.ViewModels;
+using BalanceBot.Desktop.Views;
 using BalanceBot.Protocol.Dtos;
 using ScottPlot;
 
@@ -27,65 +28,103 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        SetupPlots();
-        SetupBlackBoxPlotTheme();
-        SetupBodePlotsTheme();
+        // Даём UI время отрисовать вкладки, затем настраиваем графики
+        Dispatcher.BeginInvoke(() =>
+        {
+            SetupPlots();
+            SetupBlackBoxPlotTheme();
+            SetupBodePlotsTheme();
+        }, System.Windows.Threading.DispatcherPriority.Render);
+    }
+
+    private DashboardView? GetDashboardView()
+    {
+        // Находим DashboardView в визуальном дереве
+        return FindVisualChild<DashboardView>(this);
+    }
+
+    private BlackBoxView? GetBlackBoxView()
+    {
+        return FindVisualChild<BlackBoxView>(this);
+    }
+
+    private BodeView? GetBodeView()
+    {
+        return FindVisualChild<BodeView>(this);
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is T typedChild)
+                return typedChild;
+
+            var result = FindVisualChild<T>(child);
+            if (result != null)
+                return result;
+        }
+        return null;
     }
 
     private void SetupPlots()
     {
-        var pOri = PlotOrientation.Plot;
-        pOri.FigureBackground.Color = Color.FromHex("#12141A");
-        pOri.DataBackground.Color = Color.FromHex("#1B1F28");
-        pOri.Axes.Color(Color.FromHex("#8B93A7"));
-        pOri.Grid.MajorLineColor = Color.FromHex("#222733");
-        pOri.Axes.Title.Label.Text = "Ориентация и IMU (Градусы °)";
-        pOri.Axes.Title.Label.FontSize = 13;
+        var dashboard = GetDashboardView();
+        if (dashboard == null) return;
 
-        var angleStreamer = pOri.Add.DataStreamer(600);
-        angleStreamer.Color = Color.FromHex("#3D7EFF");
+        var plotOri = dashboard.PlotOrientationControl.Plot;
+        plotOri.FigureBackground.Color = Color.FromHex("#0D0F14");
+        plotOri.DataBackground.Color = Color.FromHex("#161A22");
+        plotOri.Axes.Color(Color.FromHex("#8B95A5"));
+        plotOri.Grid.MajorLineColor = Color.FromHex("#1E232E");
+        plotOri.Axes.Title.Label.Text = "Ориентация и IMU (Градусы °)";
+        plotOri.Axes.Title.Label.FontSize = 13;
+
+        var angleStreamer = plotOri.Add.DataStreamer(600);
+        angleStreamer.Color = Color.FromHex("#4A90FF");
         angleStreamer.ViewScrollLeft();
 
-        var gyroStreamer = pOri.Add.DataStreamer(600);
-        gyroStreamer.Color = Color.FromHex("#00E676");
+        var gyroStreamer = plotOri.Add.DataStreamer(600);
+        gyroStreamer.Color = Color.FromHex("#00D084");
         gyroStreamer.ViewScrollLeft();
 
-        var trimStreamer = pOri.Add.DataStreamer(600);
-        trimStreamer.Color = Color.FromHex("#E8EAF0");
+        var trimStreamer = plotOri.Add.DataStreamer(600);
+        trimStreamer.Color = Color.FromHex("#E8ECF1");
         trimStreamer.ViewScrollLeft();
 
-        var accelStreamer = pOri.Add.DataStreamer(600);
+        var accelStreamer = plotOri.Add.DataStreamer(600);
         accelStreamer.Color = Color.FromHex("#80D8FF");
         accelStreamer.IsVisible = false;
         accelStreamer.ViewScrollLeft();
 
-        var leanStreamer = pOri.Add.DataStreamer(600);
+        var leanStreamer = plotOri.Add.DataStreamer(600);
         leanStreamer.Color = Color.FromHex("#FF6D00");
         leanStreamer.IsVisible = false;
         leanStreamer.ViewScrollLeft();
 
-        var pMot = PlotMotors.Plot;
-        pMot.FigureBackground.Color = Color.FromHex("#12141A");
-        pMot.DataBackground.Color = Color.FromHex("#1B1F28");
-        pMot.Axes.Color(Color.FromHex("#8B93A7"));
-        pMot.Grid.MajorLineColor = Color.FromHex("#222733");
-        pMot.Axes.Title.Label.Text = "Привод колес и регулятор (об/с)";
-        pMot.Axes.Title.Label.FontSize = 13;
+        var plotMot = dashboard.PlotMotorsControl.Plot;
+        plotMot.FigureBackground.Color = Color.FromHex("#0D0F14");
+        plotMot.DataBackground.Color = Color.FromHex("#161A22");
+        plotMot.Axes.Color(Color.FromHex("#8B95A5"));
+        plotMot.Grid.MajorLineColor = Color.FromHex("#1E232E");
+        plotMot.Axes.Title.Label.Text = "Привод колес и регулятор (об/с)";
+        plotMot.Axes.Title.Label.FontSize = 13;
 
-        var cmdStreamer = pMot.Add.DataStreamer(600);
-        cmdStreamer.Color = Color.FromHex("#FFB300");
+        var cmdStreamer = plotMot.Add.DataStreamer(600);
+        cmdStreamer.Color = Color.FromHex("#FFA502");
         cmdStreamer.ViewScrollLeft();
 
-        var wheelStreamer = pMot.Add.DataStreamer(600);
+        var wheelStreamer = plotMot.Add.DataStreamer(600);
         wheelStreamer.Color = Color.FromHex("#B388FF");
         wheelStreamer.ViewScrollLeft();
 
-        var termPStreamer = pMot.Add.DataStreamer(600);
+        var termPStreamer = plotMot.Add.DataStreamer(600);
         termPStreamer.Color = Color.FromHex("#FF4081");
         termPStreamer.IsVisible = false;
         termPStreamer.ViewScrollLeft();
 
-        var termDStreamer = pMot.Add.DataStreamer(600);
+        var termDStreamer = plotMot.Add.DataStreamer(600);
         termDStreamer.Color = Color.FromHex("#78909C");
         termDStreamer.IsVisible = false;
         termDStreamer.ViewScrollLeft();
@@ -109,16 +148,16 @@ public partial class MainWindow : Window
 
                 d.RequestPlotsRefresh = () =>
                 {
-                    PlotOrientation.Refresh();
-                    PlotMotors.Refresh();
+                    dashboard.PlotOrientationControl.Refresh();
+                    dashboard.PlotMotorsControl.Refresh();
                 };
 
                 d.RequestPlotsReset = () =>
                 {
-                    PlotOrientation.Plot.Axes.AutoScale();
-                    PlotMotors.Plot.Axes.AutoScale();
-                    PlotOrientation.Refresh();
-                    PlotMotors.Refresh();
+                    dashboard.PlotOrientationControl.Plot.Axes.AutoScale();
+                    dashboard.PlotMotorsControl.Plot.Axes.AutoScale();
+                    dashboard.PlotOrientationControl.Refresh();
+                    dashboard.PlotMotorsControl.Refresh();
                 };
             }
 
@@ -134,25 +173,30 @@ public partial class MainWindow : Window
             }
         };
 
-        PlotOrientation.Refresh();
-        PlotMotors.Refresh();
+        dashboard.PlotOrientationControl.Refresh();
+        dashboard.PlotMotorsControl.Refresh();
     }
 
     private void SetupBlackBoxPlotTheme()
     {
-        var plot = PlotBlackBox.Plot;
-        plot.FigureBackground.Color = Color.FromHex("#12141A");
-        plot.DataBackground.Color = Color.FromHex("#1B1F28");
-        plot.Axes.Color(Color.FromHex("#8B93A7"));
-        plot.Grid.MajorLineColor = Color.FromHex("#222733");
-        // Легенда добавляется один раз: ShowLegend(Edge) создает новую панель при каждом вызове
+        var view = GetBlackBoxView();
+        if (view == null) return;
+
+        var plot = view.PlotBlackBoxControl.Plot;
+        plot.FigureBackground.Color = Color.FromHex("#0D0F14");
+        plot.DataBackground.Color = Color.FromHex("#161A22");
+        plot.Axes.Color(Color.FromHex("#8B95A5"));
+        plot.Grid.MajorLineColor = Color.FromHex("#1E232E");
         plot.ShowLegend(Edge.Top);
-        PlotBlackBox.Refresh();
+        view.PlotBlackBoxControl.Refresh();
     }
 
     private void RenderBlackBoxFrames(List<BlackBoxFrameDto> frames)
     {
-        var plot = PlotBlackBox.Plot;
+        var view = GetBlackBoxView();
+        if (view == null) return;
+
+        var plot = view.PlotBlackBoxControl.Plot;
         plot.Clear();
 
         uint startMs = frames[0].TimestampMs;
@@ -161,66 +205,73 @@ public partial class MainWindow : Window
         double[] gyros = frames.Select(f => (double)f.Gyro).ToArray();
         double[] cmds = frames.Select(f => (double)f.Cmd / 3200.0).ToArray();
 
-        var angleScatter = plot.Add.Scatter(times, angles, Color.FromHex("#3D7EFF"));
+        var angleScatter = plot.Add.Scatter(times, angles, Color.FromHex("#4A90FF"));
         angleScatter.LegendText = "Угол наклона (°)";
 
-        var gyroScatter = plot.Add.Scatter(times, gyros, Color.FromHex("#00E676"));
+        var gyroScatter = plot.Add.Scatter(times, gyros, Color.FromHex("#00D084"));
         gyroScatter.LegendText = "Гироскоп (°/с)";
 
-        var cmdScatter = plot.Add.Scatter(times, cmds, Color.FromHex("#FFB300"));
+        var cmdScatter = plot.Add.Scatter(times, cmds, Color.FromHex("#FFA502"));
         cmdScatter.LegendText = "Команда мотора (об/с)";
 
         plot.Axes.AutoScale();
-        PlotBlackBox.Refresh();
+        view.PlotBlackBoxControl.Refresh();
     }
 
     private void SetupBodePlotsTheme()
     {
-        foreach (var wpfPlot in new[] { PlotStepResponse, PlotBodeMag, PlotBodePhase })
+        var view = GetBodeView();
+        if (view == null) return;
+
+        foreach (var wpfPlot in new[] { view.PlotStepResponseControl, view.PlotBodeMagControl, view.PlotBodePhaseControl })
         {
             var plot = wpfPlot.Plot;
-            plot.FigureBackground.Color = Color.FromHex("#12141A");
-            plot.DataBackground.Color = Color.FromHex("#1B1F28");
-            plot.Axes.Color(Color.FromHex("#8B93A7"));
-            plot.Grid.MajorLineColor = Color.FromHex("#222733");
+            plot.FigureBackground.Color = Color.FromHex("#0D0F14");
+            plot.DataBackground.Color = Color.FromHex("#161A22");
+            plot.Axes.Color(Color.FromHex("#8B95A5"));
+            plot.Grid.MajorLineColor = Color.FromHex("#1E232E");
             wpfPlot.Refresh();
         }
 
-        PlotStepResponse.Plot.Axes.Title.Label.Text = "Отклик на импульс трима";
-        PlotStepResponse.Plot.Axes.Title.Label.FontSize = 13;
+        view.PlotStepResponseControl.Plot.Axes.Title.Label.Text = "Отклик на импульс трима";
+        view.PlotStepResponseControl.Plot.Axes.Title.Label.FontSize = 13;
 
-        PlotBodeMag.Plot.Axes.Title.Label.Text = "АЧХ контура |L| (дБ), ось X — log10(f/Гц)";
-        PlotBodeMag.Plot.Axes.Title.Label.FontSize = 13;
+        view.PlotBodeMagControl.Plot.Axes.Title.Label.Text = "АЧХ контура |L| (дБ), ось X — log10(f/Гц)";
+        view.PlotBodeMagControl.Plot.Axes.Title.Label.FontSize = 13;
 
-        PlotBodePhase.Plot.Axes.Title.Label.Text = "ФЧХ контура ∠L (°), ось X — log10(f/Гц)";
-        PlotBodePhase.Plot.Axes.Title.Label.FontSize = 13;
+        view.PlotBodePhaseControl.Plot.Axes.Title.Label.Text = "ФЧХ контура ∠L (°), ось X — log10(f/Гц)";
+        view.PlotBodePhaseControl.Plot.Axes.Title.Label.FontSize = 13;
 
-        // Легенды добавляются один раз: ShowLegend(Edge) создает новую панель при каждом вызове
-        PlotStepResponse.Plot.ShowLegend(Edge.Top);
-        PlotBodeMag.Plot.ShowLegend(Edge.Top);
-        PlotBodePhase.Plot.ShowLegend(Edge.Top);
+        view.PlotStepResponseControl.Plot.ShowLegend(Edge.Top);
+        view.PlotBodeMagControl.Plot.ShowLegend(Edge.Top);
+        view.PlotBodePhaseControl.Plot.ShowLegend(Edge.Top);
     }
 
     private void RenderBodeStepResponse(double[] time, double[] trim, double[] angle)
     {
-        var plot = PlotStepResponse.Plot;
+        var view = GetBodeView();
+        if (view == null) return;
+
+        var plot = view.PlotStepResponseControl.Plot;
         plot.Clear();
 
-        var trimScatter = plot.Add.Scatter(time, trim, Color.FromHex("#FFB300"));
+        var trimScatter = plot.Add.Scatter(time, trim, Color.FromHex("#FFA502"));
         trimScatter.LegendText = "Трим (°)";
         trimScatter.MarkerSize = 0;
 
-        var angleScatter = plot.Add.Scatter(time, angle, Color.FromHex("#3D7EFF"));
+        var angleScatter = plot.Add.Scatter(time, angle, Color.FromHex("#4A90FF"));
         angleScatter.LegendText = "Угол (°)";
         angleScatter.MarkerSize = 0;
 
         plot.Axes.AutoScale();
-        PlotStepResponse.Refresh();
+        view.PlotStepResponseControl.Refresh();
     }
 
     private void RenderBodeResult(BodeResult result)
     {
-        // Ось X в логарифмическом масштабе через log10(f): ScottPlot 5.0 не имеет встроенной лог-оси
+        var view = GetBodeView();
+        if (view == null) return;
+
         double[] logFreqs = result.Loop.Select(p => Math.Log10(p.FreqHz)).ToArray();
         double[] logClosedFreqs = result.ClosedLoop.Select(p => Math.Log10(p.FreqHz)).ToArray();
         double[] loopMag = result.Loop.Select(p => p.MagDb).ToArray();
@@ -231,10 +282,10 @@ public partial class MainWindow : Window
         double xMax = Math.Log10(Math.Max(10.0, result.SampleRateHz / 2.0)) + 0.1;
 
         // --- АЧХ ---
-        var magPlot = PlotBodeMag.Plot;
+        var magPlot = view.PlotBodeMagControl.Plot;
         magPlot.Clear();
 
-        var loopMagScatter = magPlot.Add.Scatter(logFreqs, loopMag, Color.FromHex("#3D7EFF"));
+        var loopMagScatter = magPlot.Add.Scatter(logFreqs, loopMag, Color.FromHex("#4A90FF"));
         loopMagScatter.LegendText = "Контур L";
         loopMagScatter.MarkerSize = 0;
         loopMagScatter.LineWidth = 2;
@@ -244,27 +295,27 @@ public partial class MainWindow : Window
         closedMagScatter.MarkerSize = 0;
         closedMagScatter.LinePattern = LinePattern.Dashed;
 
-        magPlot.Add.HorizontalLine(0, 1, Color.FromHex("#39445C"), LinePattern.Solid);
+        magPlot.Add.HorizontalLine(0, 1, Color.FromHex("#2A3040"), LinePattern.Solid);
 
         if (result.GainCrossoverHz.HasValue)
         {
-            magPlot.Add.VerticalLine(Math.Log10(result.GainCrossoverHz.Value), 1, Color.FromHex("#00E676"), LinePattern.Dashed);
+            magPlot.Add.VerticalLine(Math.Log10(result.GainCrossoverHz.Value), 1, Color.FromHex("#00D084"), LinePattern.Dashed);
         }
 
         magPlot.Axes.SetLimitsX(xMin, xMax);
         magPlot.Axes.AutoScaleY();
-        PlotBodeMag.Refresh();
+        view.PlotBodeMagControl.Refresh();
 
         // --- ФЧХ ---
-        var phasePlot = PlotBodePhase.Plot;
+        var phasePlot = view.PlotBodePhaseControl.Plot;
         phasePlot.Clear();
 
-        var loopPhaseScatter = phasePlot.Add.Scatter(logFreqs, loopPhase, Color.FromHex("#00E676"));
+        var loopPhaseScatter = phasePlot.Add.Scatter(logFreqs, loopPhase, Color.FromHex("#00D084"));
         loopPhaseScatter.LegendText = "Фаза L";
         loopPhaseScatter.MarkerSize = 0;
         loopPhaseScatter.LineWidth = 2;
 
-        phasePlot.Add.HorizontalLine(-180, 1, Color.FromHex("#39445C"), LinePattern.Solid);
+        phasePlot.Add.HorizontalLine(-180, 1, Color.FromHex("#2A3040"), LinePattern.Solid);
 
         if (result.PhaseCrossoverHz.HasValue)
         {
@@ -273,7 +324,7 @@ public partial class MainWindow : Window
 
         phasePlot.Axes.SetLimitsX(xMin, xMax);
         phasePlot.Axes.AutoScaleY();
-        PlotBodePhase.Refresh();
+        view.PlotBodePhaseControl.Refresh();
     }
 
     private void OnWindowKeyDown(object sender, KeyEventArgs e)
@@ -285,14 +336,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Горячие клавиши микротримминга угла на лету: [ и ]
-        if (e.Key == Key.OemOpenBrackets) // Клавиша [ (или русская Х) -> чуть назад
+        if (e.Key == Key.OemOpenBrackets)
         {
             _vm.Dashboard?.AdjustTrimCommand.Execute("-0.05");
             e.Handled = true;
             return;
         }
-        if (e.Key == Key.OemCloseBrackets) // Клавиша ] (или русская Ъ) -> чуть вперед
+        if (e.Key == Key.OemCloseBrackets)
         {
             _vm.Dashboard?.AdjustTrimCommand.Execute("0.05");
             e.Handled = true;

@@ -1,0 +1,26 @@
+<UserControl x:Class="BalanceBot.Desktop.Controls.MetricCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:BalanceBot.Desktop.Controls">
+
+    <Border Style="{StaticResource CardPanel}" Padding="12,10">
+        <StackPanel>
+            <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=local:MetricCard}}"
+                       FontSize="{StaticResource FontSizeCaption}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       TextTrimming="CharacterEllipsis" />
+            <ContentControl Content="{Binding ValueContent, RelativeSource={RelativeSource AncestorType=local:MetricCard}}"
+                            Margin="0,4,0,0">
+                <ContentControl.ContentTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   FontSize="{StaticResource FontSizeHeadline}"
+                                   FontWeight="Bold"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=local:MetricCard}}"
+                                   TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                </ContentControl.ContentTemplate>
+            </ContentControl>
+        </StackPanel>
+    </Border>
+</UserControl>

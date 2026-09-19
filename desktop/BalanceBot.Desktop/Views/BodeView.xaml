@@ -1,0 +1,120 @@
+<UserControl x:Class="BalanceBot.Desktop.Views.BodeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctrl="clr-namespace:BalanceBot.Desktop.Controls"
+             xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Панель управления тестом -->
+        <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding StatusMessage}"
+                               FontSize="{StaticResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AccentBrush}"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="Тест подаёт короткий импульс трима и записывает отклик угла: АЧХ/ФЧХ через БПФ, запасы по фазе и усилению."
+                               FontSize="{StaticResource FontSizeCaption}"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="0,2,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Margin="0,0,14,0" VerticalAlignment="Center">
+                        <TextBlock Text="Амплитуда импульса"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                        <StackPanel Orientation="Horizontal">
+                            <Slider Minimum="0.3" Maximum="3.0"
+                                    Value="{Binding PulseAmplitude}"
+                                    SmallChange="0.1" LargeChange="0.5"
+                                    Width="110" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding PulseAmplitude, StringFormat={}{0:F1}°}"
+                                       FontSize="{StaticResource FontSizeBody}"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource WarningBrush}"
+                                       Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Button Content="&#xE768; Запустить тест"
+                            Style="{StaticResource ModernButton}"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Command="{Binding RunTestCommand}"
+                            Visibility="{Binding IsRunning, Converter={StaticResource InverseBoolToVis}}"
+                            Margin="0,0,8,0" Padding="16,10" />
+                    <Button Content="&#xE71A; Прервать"
+                            Style="{StaticResource DangerButton}"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Command="{Binding StopTestCommand}"
+                            Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}"
+                            Margin="0,0,8,0" Padding="16,10" />
+                    <Button Content="&#xE74E; Экспорт CSV"
+                            Style="{StaticResource SecondaryButton}"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Command="{Binding ExportCsvCommand}"
+                            IsEnabled="{Binding HasResult}"
+                            Padding="14,10" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Запасы + графики -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Карточки запасов -->
+            <UniformGrid Grid.Row="0" Columns="4" Margin="0,0,0,12">
+                <ctrl:MetricCard Title="Запас по усилению"
+                                 ValueContent="{Binding GainMarginText}"
+                                 ValueForeground="{StaticResource SuccessBrush}"
+                                 Margin="0,0,6,0" />
+                <ctrl:MetricCard Title="Запас по фазе"
+                                 ValueContent="{Binding PhaseMarginText}"
+                                 ValueForeground="{StaticResource SuccessBrush}"
+                                 Margin="3,0,3,0" />
+                <ctrl:MetricCard Title="Частота среза"
+                                 ValueContent="{Binding CrossoverText}"
+                                 ValueForeground="{StaticResource AccentBrush}"
+                                 Margin="3,0,3,0" />
+                <ctrl:MetricCard Title="Резонанс |T|"
+                                 ValueContent="{Binding PeakText}"
+                                 ValueForeground="{StaticResource WarningBrush}"
+                                 Margin="6,0,0,0" />
+            </UniformGrid>
+
+            <!-- Графики -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="300" />
+                    <ColumnDefinition Width="*" MinWidth="300" />
+                    <ColumnDefinition Width="*" MinWidth="300" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource CardPanel}" Margin="0,0,6,0" Padding="4">
+                    <ScottPlot:WpfPlot x:Name="PlotStepResponse" />
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource CardPanel}" Margin="3,0,3,0" Padding="4">
+                    <ScottPlot:WpfPlot x:Name="PlotBodeMag" />
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource CardPanel}" Margin="6,0,0,0" Padding="4">
+                    <ScottPlot:WpfPlot x:Name="PlotBodePhase" />
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

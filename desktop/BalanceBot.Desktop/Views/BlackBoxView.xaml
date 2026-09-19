@@ -1,0 +1,48 @@
+<UserControl x:Class="BalanceBot.Desktop.Views.BlackBoxView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Панель управления -->
+        <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding StatusMessage}"
+                               FontSize="{StaticResource FontSizeBody}"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="Запись последних 2 секунд на частоте 200 Гц до удара о пол"
+                               FontSize="{StaticResource FontSizeCaption}"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="0,2,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Content="&#xE74C; Очистить ящик"
+                            Style="{StaticResource SecondaryButton}"
+                            Command="{Binding ClearBlackBoxCommand}"
+                            Margin="0,0,8,0" />
+                    <Button Content="&#xE896; Выгрузить и разобрать аварию"
+                            Style="{StaticResource ModernButton}"
+                            Command="{Binding LoadBlackBoxCommand}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- График -->
+        <Border Grid.Row="1" Style="{StaticResource CardPanel}" Padding="4">
+            <ScottPlot:WpfPlot x:Name="PlotBlackBox" />
+        </Border>
+    </Grid>
+</UserControl>
