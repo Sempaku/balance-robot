@@ -37,6 +37,22 @@ public partial class MainWindow : Window
         }, System.Windows.Threading.DispatcherPriority.Render);
     }
 
+    /// <summary>
+    /// Читает Color из Application.Resources и конвертирует в ScottPlot.Color.
+    /// </summary>
+    private static ScottPlot.Color GetPlotColor(string resourceKey)
+    {
+        if (Application.Current.Resources.Contains(resourceKey))
+        {
+            var value = Application.Current.Resources[resourceKey];
+            if (value is System.Windows.Media.Color wpfColor)
+            {
+                return new ScottPlot.Color(wpfColor.R, wpfColor.G, wpfColor.B, wpfColor.A);
+            }
+        }
+        return ScottPlot.Color.FromHex("#888888");
+    }
+
     private DashboardView? GetDashboardView()
     {
         // Находим DashboardView в визуальном дереве
@@ -74,58 +90,58 @@ public partial class MainWindow : Window
         if (dashboard == null) return;
 
         var plotOri = dashboard.PlotOrientationControl.Plot;
-        plotOri.FigureBackground.Color = Color.FromHex("#0D0F14");
-        plotOri.DataBackground.Color = Color.FromHex("#161A22");
-        plotOri.Axes.Color(Color.FromHex("#8B95A5"));
-        plotOri.Grid.MajorLineColor = Color.FromHex("#1E232E");
+        plotOri.FigureBackground.Color = GetPlotColor("PlotFigureBgColor");
+        plotOri.DataBackground.Color = GetPlotColor("PlotDataBgColor");
+        plotOri.Axes.Color(GetPlotColor("PlotAxesColor"));
+        plotOri.Grid.MajorLineColor = GetPlotColor("PlotGridColor");
         plotOri.Axes.Title.Label.Text = "Ориентация и IMU (Градусы °)";
         plotOri.Axes.Title.Label.FontSize = 13;
 
         var angleStreamer = plotOri.Add.DataStreamer(600);
-        angleStreamer.Color = Color.FromHex("#4A90FF");
+        angleStreamer.Color = GetPlotColor("PlotAngleColor");
         angleStreamer.ViewScrollLeft();
 
         var gyroStreamer = plotOri.Add.DataStreamer(600);
-        gyroStreamer.Color = Color.FromHex("#00D084");
+        gyroStreamer.Color = GetPlotColor("PlotGyroColor");
         gyroStreamer.ViewScrollLeft();
 
         var trimStreamer = plotOri.Add.DataStreamer(600);
-        trimStreamer.Color = Color.FromHex("#E8ECF1");
+        trimStreamer.Color = GetPlotColor("PlotTrimColor");
         trimStreamer.ViewScrollLeft();
 
         var accelStreamer = plotOri.Add.DataStreamer(600);
-        accelStreamer.Color = Color.FromHex("#80D8FF");
+        accelStreamer.Color = GetPlotColor("PlotAccelAngleColor");
         accelStreamer.IsVisible = false;
         accelStreamer.ViewScrollLeft();
 
         var leanStreamer = plotOri.Add.DataStreamer(600);
-        leanStreamer.Color = Color.FromHex("#FF6D00");
+        leanStreamer.Color = GetPlotColor("PlotLeanColor");
         leanStreamer.IsVisible = false;
         leanStreamer.ViewScrollLeft();
 
         var plotMot = dashboard.PlotMotorsControl.Plot;
-        plotMot.FigureBackground.Color = Color.FromHex("#0D0F14");
-        plotMot.DataBackground.Color = Color.FromHex("#161A22");
-        plotMot.Axes.Color(Color.FromHex("#8B95A5"));
-        plotMot.Grid.MajorLineColor = Color.FromHex("#1E232E");
+        plotMot.FigureBackground.Color = GetPlotColor("PlotFigureBgColor");
+        plotMot.DataBackground.Color = GetPlotColor("PlotDataBgColor");
+        plotMot.Axes.Color(GetPlotColor("PlotAxesColor"));
+        plotMot.Grid.MajorLineColor = GetPlotColor("PlotGridColor");
         plotMot.Axes.Title.Label.Text = "Привод колес и регулятор (об/с)";
         plotMot.Axes.Title.Label.FontSize = 13;
 
         var cmdStreamer = plotMot.Add.DataStreamer(600);
-        cmdStreamer.Color = Color.FromHex("#FFA502");
+        cmdStreamer.Color = GetPlotColor("PlotCmdColor");
         cmdStreamer.ViewScrollLeft();
 
         var wheelStreamer = plotMot.Add.DataStreamer(600);
-        wheelStreamer.Color = Color.FromHex("#B388FF");
+        wheelStreamer.Color = GetPlotColor("PlotWheelRateColor");
         wheelStreamer.ViewScrollLeft();
 
         var termPStreamer = plotMot.Add.DataStreamer(600);
-        termPStreamer.Color = Color.FromHex("#FF4081");
+        termPStreamer.Color = GetPlotColor("PlotTermPColor");
         termPStreamer.IsVisible = false;
         termPStreamer.ViewScrollLeft();
 
         var termDStreamer = plotMot.Add.DataStreamer(600);
-        termDStreamer.Color = Color.FromHex("#78909C");
+        termDStreamer.Color = GetPlotColor("PlotTermDColor");
         termDStreamer.IsVisible = false;
         termDStreamer.ViewScrollLeft();
 
@@ -183,10 +199,10 @@ public partial class MainWindow : Window
         if (view == null) return;
 
         var plot = view.PlotBlackBoxControl.Plot;
-        plot.FigureBackground.Color = Color.FromHex("#0D0F14");
-        plot.DataBackground.Color = Color.FromHex("#161A22");
-        plot.Axes.Color(Color.FromHex("#8B95A5"));
-        plot.Grid.MajorLineColor = Color.FromHex("#1E232E");
+        plot.FigureBackground.Color = GetPlotColor("PlotFigureBgColor");
+        plot.DataBackground.Color = GetPlotColor("PlotDataBgColor");
+        plot.Axes.Color(GetPlotColor("PlotAxesColor"));
+        plot.Grid.MajorLineColor = GetPlotColor("PlotGridColor");
         plot.ShowLegend(Edge.Top);
         view.PlotBlackBoxControl.Refresh();
     }
@@ -205,13 +221,13 @@ public partial class MainWindow : Window
         double[] gyros = frames.Select(f => (double)f.Gyro).ToArray();
         double[] cmds = frames.Select(f => (double)f.Cmd / 3200.0).ToArray();
 
-        var angleScatter = plot.Add.Scatter(times, angles, Color.FromHex("#4A90FF"));
+        var angleScatter = plot.Add.Scatter(times, angles, GetPlotColor("PlotAngleColor"));
         angleScatter.LegendText = "Угол наклона (°)";
 
-        var gyroScatter = plot.Add.Scatter(times, gyros, Color.FromHex("#00D084"));
+        var gyroScatter = plot.Add.Scatter(times, gyros, GetPlotColor("PlotGyroColor"));
         gyroScatter.LegendText = "Гироскоп (°/с)";
 
-        var cmdScatter = plot.Add.Scatter(times, cmds, Color.FromHex("#FFA502"));
+        var cmdScatter = plot.Add.Scatter(times, cmds, GetPlotColor("PlotCmdColor"));
         cmdScatter.LegendText = "Команда мотора (об/с)";
 
         plot.Axes.AutoScale();
@@ -226,10 +242,10 @@ public partial class MainWindow : Window
         foreach (var wpfPlot in new[] { view.PlotStepResponseControl, view.PlotBodeMagControl, view.PlotBodePhaseControl })
         {
             var plot = wpfPlot.Plot;
-            plot.FigureBackground.Color = Color.FromHex("#0D0F14");
-            plot.DataBackground.Color = Color.FromHex("#161A22");
-            plot.Axes.Color(Color.FromHex("#8B95A5"));
-            plot.Grid.MajorLineColor = Color.FromHex("#1E232E");
+            plot.FigureBackground.Color = GetPlotColor("PlotFigureBgColor");
+            plot.DataBackground.Color = GetPlotColor("PlotDataBgColor");
+            plot.Axes.Color(GetPlotColor("PlotAxesColor"));
+            plot.Grid.MajorLineColor = GetPlotColor("PlotGridColor");
             wpfPlot.Refresh();
         }
 
@@ -255,11 +271,11 @@ public partial class MainWindow : Window
         var plot = view.PlotStepResponseControl.Plot;
         plot.Clear();
 
-        var trimScatter = plot.Add.Scatter(time, trim, Color.FromHex("#FFA502"));
+        var trimScatter = plot.Add.Scatter(time, trim, GetPlotColor("PlotTrimSignalColor"));
         trimScatter.LegendText = "Трим (°)";
         trimScatter.MarkerSize = 0;
 
-        var angleScatter = plot.Add.Scatter(time, angle, Color.FromHex("#4A90FF"));
+        var angleScatter = plot.Add.Scatter(time, angle, GetPlotColor("PlotAngleColor"));
         angleScatter.LegendText = "Угол (°)";
         angleScatter.MarkerSize = 0;
 
@@ -285,21 +301,21 @@ public partial class MainWindow : Window
         var magPlot = view.PlotBodeMagControl.Plot;
         magPlot.Clear();
 
-        var loopMagScatter = magPlot.Add.Scatter(logFreqs, loopMag, Color.FromHex("#4A90FF"));
+        var loopMagScatter = magPlot.Add.Scatter(logFreqs, loopMag, GetPlotColor("PlotLoopMagColor"));
         loopMagScatter.LegendText = "Контур L";
         loopMagScatter.MarkerSize = 0;
         loopMagScatter.LineWidth = 2;
 
-        var closedMagScatter = magPlot.Add.Scatter(logClosedFreqs, closedMag, Color.FromHex("#78909C"));
+        var closedMagScatter = magPlot.Add.Scatter(logClosedFreqs, closedMag, GetPlotColor("PlotClosedMagColor"));
         closedMagScatter.LegendText = "Замкнутая T";
         closedMagScatter.MarkerSize = 0;
         closedMagScatter.LinePattern = LinePattern.Dashed;
 
-        magPlot.Add.HorizontalLine(0, 1, Color.FromHex("#2A3040"), LinePattern.Solid);
+        magPlot.Add.HorizontalLine(0, 1, GetPlotColor("PlotReferenceLineColor"), LinePattern.Solid);
 
         if (result.GainCrossoverHz.HasValue)
         {
-            magPlot.Add.VerticalLine(Math.Log10(result.GainCrossoverHz.Value), 1, Color.FromHex("#00D084"), LinePattern.Dashed);
+            magPlot.Add.VerticalLine(Math.Log10(result.GainCrossoverHz.Value), 1, GetPlotColor("PlotGainCrossoverColor"), LinePattern.Dashed);
         }
 
         magPlot.Axes.SetLimitsX(xMin, xMax);
@@ -310,16 +326,16 @@ public partial class MainWindow : Window
         var phasePlot = view.PlotBodePhaseControl.Plot;
         phasePlot.Clear();
 
-        var loopPhaseScatter = phasePlot.Add.Scatter(logFreqs, loopPhase, Color.FromHex("#00D084"));
+        var loopPhaseScatter = phasePlot.Add.Scatter(logFreqs, loopPhase, GetPlotColor("PlotLoopPhaseColor"));
         loopPhaseScatter.LegendText = "Фаза L";
         loopPhaseScatter.MarkerSize = 0;
         loopPhaseScatter.LineWidth = 2;
 
-        phasePlot.Add.HorizontalLine(-180, 1, Color.FromHex("#2A3040"), LinePattern.Solid);
+        phasePlot.Add.HorizontalLine(-180, 1, GetPlotColor("PlotReferenceLineColor"), LinePattern.Solid);
 
         if (result.PhaseCrossoverHz.HasValue)
         {
-            phasePlot.Add.VerticalLine(Math.Log10(result.PhaseCrossoverHz.Value), 1, Color.FromHex("#FF4081"), LinePattern.Dashed);
+            phasePlot.Add.VerticalLine(Math.Log10(result.PhaseCrossoverHz.Value), 1, GetPlotColor("PlotPhaseCrossoverColor"), LinePattern.Dashed);
         }
 
         phasePlot.Axes.SetLimitsX(xMin, xMax);
