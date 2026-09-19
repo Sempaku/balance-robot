@@ -7,6 +7,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Theme/PlotColors.xaml" />
             </ResourceDictionary.MergedDictionaries>
+
         <!-- ===== Цветовая палитра темы ===== -->
         <Color x:Key="BgDarkColor">#0D0F14</Color>
         <Color x:Key="BgCardColor">#161A22</Color>
@@ -36,10 +37,6 @@
         <sys:Double x:Key="FontSizeTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">15</sys:Double>
         <sys:Double x:Key="FontSizeHeadline" xmlns:sys="clr-namespace:System;assembly=mscorlib">20</sys:Double>
 
-        <!-- ===== Скругления ===== -->
-        <CornerRadius x:Key="CornerRadiusSmall">6</CornerRadius>
-        <CornerRadius x:Key="CornerRadiusMedium">10</CornerRadius>
-
         <!-- ===== Отступы ===== -->
         <Thickness x:Key="SpacingSmall">8</Thickness>
         <Thickness x:Key="SpacingMedium">16</Thickness>
@@ -61,7 +58,7 @@
             <Setter Property="Background" Value="{StaticResource BgCardBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}" />
+            <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="{StaticResource SpacingMedium}" />
         </Style>
 
@@ -79,7 +76,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="border"
                                 Background="{TemplateBinding Background}"
-                                CornerRadius="{StaticResource CornerRadiusSmall}"
+                                CornerRadius="6"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
@@ -130,7 +127,7 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="{StaticResource CornerRadiusSmall}">
+                                CornerRadius="6">
                             <ScrollViewer x:Name="PART_ContentHost" Margin="2" />
                         </Border>
                     </ControlTemplate>

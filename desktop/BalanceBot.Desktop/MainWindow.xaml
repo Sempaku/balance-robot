@@ -40,7 +40,7 @@
                                VerticalAlignment="Center"
                                Margin="0,0,16,0" />
                     <Border Background="{StaticResource BgDarkBrush}"
-                            CornerRadius="{StaticResource CornerRadiusSmall}"
+                            CornerRadius="6"
                             Padding="10,6"
                             BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                             MaxWidth="340">
