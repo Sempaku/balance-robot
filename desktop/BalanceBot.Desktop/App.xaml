@@ -37,9 +37,8 @@
         <sys:Double x:Key="FontSizeTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">15</sys:Double>
         <sys:Double x:Key="FontSizeHeadline" xmlns:sys="clr-namespace:System;assembly=mscorlib">20</sys:Double>
 
-        <!-- ===== Отступы ===== -->
-        <Thickness x:Key="SpacingSmall">8</Thickness>
-        <Thickness x:Key="SpacingMedium">16</Thickness>
+        <!-- ===== Отступы (значения для прямого использования) ===== -->
+        <!-- В WPF Thickness нельзя использовать как StaticResource в некоторых контекстах -->
 
         <!-- ===== Базовые стили ===== -->
         <Style TargetType="TextBlock">
@@ -59,7 +58,7 @@
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Padding" Value="{StaticResource SpacingMedium}" />
+            <Setter Property="Padding" Value="16" />
         </Style>
 
         <!-- ===== ModernButton ===== -->
