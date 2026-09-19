@@ -6,49 +6,85 @@
              xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF">
 
     <Grid>
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="LayoutStates">
+                <VisualState x:Name="Wide">
+                    <Storyboard>
+                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SidebarColumn" Storyboard.TargetProperty="Width">
+                            <DiscreteObjectKeyFrame KeyTime="0">
+                                <DiscreteObjectKeyFrame.Value>
+                                    <GridLength>300</GridLength>
+                                </DiscreteObjectKeyFrame.Value>
+                            </DiscreteObjectKeyFrame>
+                        </ObjectAnimationUsingKeyFrames>
+                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SidebarBorder" Storyboard.TargetProperty="Visibility">
+                            <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Visible}" />
+                        </ObjectAnimationUsingKeyFrames>
+                    </Storyboard>
+                </VisualState>
+                <VisualState x:Name="Narrow">
+                    <Storyboard>
+                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SidebarColumn" Storyboard.TargetProperty="Width">
+                            <DiscreteObjectKeyFrame KeyTime="0">
+                                <DiscreteObjectKeyFrame.Value>
+                                    <GridLength>0</GridLength>
+                                </DiscreteObjectKeyFrame.Value>
+                            </DiscreteObjectKeyFrame>
+                        </ObjectAnimationUsingKeyFrames>
+                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SidebarBorder" Storyboard.TargetProperty="Visibility">
+                            <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Collapsed}" />
+                        </ObjectAnimationUsingKeyFrames>
+                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ToggleSidebarButton" Storyboard.TargetProperty="Visibility">
+                            <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Visible}" />
+                        </ObjectAnimationUsingKeyFrames>
+                    </Storyboard>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Метрики -->
-        <UniformGrid Grid.Row="0" Columns="4" Margin="0,0,0,12">
+        <!-- Метрики: адаптивная сетка -->
+        <WrapPanel Grid.Row="0" Margin="0,0,0,12">
             <ctrl:MetricCard Title="Состояние"
                              ValueContent="{Binding StateText}"
                              ValueForeground="{StaticResource AccentBrush}"
-                             Margin="0,0,6,6" />
+                             MinWidth="140" Margin="0,0,6,6" />
             <ctrl:MetricCard Title="Угол наклона"
                              ValueContent="{Binding Angle, StringFormat={}{0:F2}°}"
-                             Margin="3,0,3,6" />
+                             MinWidth="140" Margin="0,0,6,6" />
             <ctrl:MetricCard Title="Гироскоп"
                              ValueContent="{Binding Gyro, StringFormat={}{0:F1}°/с}"
-                             Margin="3,0,3,6" />
+                             MinWidth="140" Margin="0,0,6,6" />
             <ctrl:MetricCard Title="Тяга привода"
                              ValueContent="{Binding CmdRps, StringFormat={}{0:F2} об/с}"
                              ValueForeground="{StaticResource WarningBrush}"
-                             Margin="3,0,3,6" />
+                             MinWidth="140" Margin="0,0,6,6" />
             <ctrl:MetricCard Title="Скорость колес"
                              ValueContent="{Binding WheelRateRps, StringFormat={}{0:F2} об/с}"
-                             Margin="0,6,6,0" />
+                             MinWidth="140" Margin="0,0,6,6" />
             <ctrl:MetricCard Title="Наклон хода (Lean)"
                              ValueContent="{Binding Lean, StringFormat={}{0:+0.00;-0.00;0.00}°}"
                              ValueForeground="{StaticResource WarningBrush}"
-                             Margin="3,6,3,0" />
+                             MinWidth="140" Margin="0,0,6,6" />
             <ctrl:MetricCard Title="Трим (равновесие)"
                              ValueContent="{Binding Trim, StringFormat={}{0:+0.00;-0.00;0.00}°}"
                              ValueForeground="{StaticResource SuccessBrush}"
-                             Margin="3,6,3,0" />
+                             MinWidth="140" Margin="0,0,6,6" />
             <ctrl:MetricCard Title="Цикл / Ошибки IMU"
                              ValueContent="{Binding DtUs, StringFormat={}{0} мкс}"
                              ValueForeground="{StaticResource SuccessBrush}"
-                             Margin="3,6,0,0" />
-        </UniformGrid>
+                             MinWidth="140" Margin="0,0,0,6" />
+        </WrapPanel>
 
         <!-- Графики + боковая панель -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" MinWidth="400" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="SidebarColumn" Width="300" />
             </Grid.ColumnDefinitions>
 
             <!-- Графики -->
@@ -57,6 +93,18 @@
                     <RowDefinition Height="*" MinHeight="200" />
                     <RowDefinition Height="*" MinHeight="200" />
                 </Grid.RowDefinitions>
+
+                <!-- Кнопка показа боковой панели на узких экранах -->
+                <Button x:Name="ToggleSidebarButton"
+                        Content="&#xE700;"
+                        FontFamily="Segoe Fluent Icons"
+                        Style="{StaticResource SecondaryButton}"
+                        Width="36" Height="36"
+                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="0,8,8,0"
+                        Visibility="Collapsed"
+                        Click="ToggleSidebar_Click"
+                        Panel.ZIndex="10" />
 
                 <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,8" Padding="4">
                     <ScottPlot:WpfPlot x:Name="PlotOrientation" />
@@ -68,9 +116,21 @@
             </Grid>
 
             <!-- Боковая панель -->
-            <Border Grid.Column="1" Style="{StaticResource CardPanel}" MinWidth="280" MaxWidth="340">
+            <Border x:Name="SidebarBorder"
+                    Grid.Column="1"
+                    Style="{StaticResource CardPanel}"
+                    MinWidth="280">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
+                        <!-- Кнопка скрытия панели -->
+                        <Button Content="&#xE711;"
+                                FontFamily="Segoe Fluent Icons"
+                                Style="{StaticResource SecondaryButton}"
+                                Width="32" Height="32"
+                                HorizontalAlignment="Right"
+                                Margin="0,0,0,8"
+                                Click="ToggleSidebar_Click" />
+
                         <!-- Трим -->
                         <TextBlock Text="Точка равновесия (Трим)"
                                    FontSize="{StaticResource FontSizeTitle}"
