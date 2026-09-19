@@ -77,44 +77,46 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Карточки запасов -->
-            <UniformGrid Grid.Row="0" Columns="4" Margin="0,0,0,12">
+            <!-- Карточки запасов: адаптивные -->
+            <WrapPanel Grid.Row="0" Margin="0,0,0,12">
                 <ctrl:MetricCard Title="Запас по усилению"
                                  ValueContent="{Binding GainMarginText}"
                                  ValueForeground="{StaticResource SuccessBrush}"
-                                 Margin="0,0,6,0" />
+                                 MinWidth="160" Margin="0,0,6,6" />
                 <ctrl:MetricCard Title="Запас по фазе"
                                  ValueContent="{Binding PhaseMarginText}"
                                  ValueForeground="{StaticResource SuccessBrush}"
-                                 Margin="3,0,3,0" />
+                                 MinWidth="160" Margin="0,0,6,6" />
                 <ctrl:MetricCard Title="Частота среза"
                                  ValueContent="{Binding CrossoverText}"
                                  ValueForeground="{StaticResource AccentBrush}"
-                                 Margin="3,0,3,0" />
+                                 MinWidth="160" Margin="0,0,6,6" />
                 <ctrl:MetricCard Title="Резонанс |T|"
                                  ValueContent="{Binding PeakText}"
                                  ValueForeground="{StaticResource WarningBrush}"
-                                 Margin="6,0,0,0" />
-            </UniformGrid>
+                                 MinWidth="160" Margin="0,0,0,6" />
+            </WrapPanel>
 
-            <!-- Графики -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MinWidth="300" />
-                    <ColumnDefinition Width="*" MinWidth="300" />
-                    <ColumnDefinition Width="*" MinWidth="300" />
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Style="{StaticResource CardPanel}" Margin="0,0,6,0" Padding="4">
-                    <ScottPlot:WpfPlot x:Name="PlotStepResponse" />
-                </Border>
-                <Border Grid.Column="1" Style="{StaticResource CardPanel}" Margin="3,0,3,0" Padding="4">
-                    <ScottPlot:WpfPlot x:Name="PlotBodeMag" />
-                </Border>
-                <Border Grid.Column="2" Style="{StaticResource CardPanel}" Margin="6,0,0,0" Padding="4">
-                    <ScottPlot:WpfPlot x:Name="PlotBodePhase" />
-                </Border>
-            </Grid>
+            <!-- Графики: адаптивная сетка -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <UniformGrid Columns="1">
+                    <Border Style="{StaticResource CardPanel}" Margin="0,0,0,8" Padding="4" MinHeight="250">
+                        <ScottPlot:WpfPlot x:Name="PlotStepResponse" />
+                    </Border>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Style="{StaticResource CardPanel}" Margin="0,0,3,0" Padding="4" MinHeight="250">
+                            <ScottPlot:WpfPlot x:Name="PlotBodeMag" />
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource CardPanel}" Margin="3,0,0,0" Padding="4" MinHeight="250">
+                            <ScottPlot:WpfPlot x:Name="PlotBodePhase" />
+                        </Border>
+                    </Grid>
+                </UniformGrid>
+            </ScrollViewer>
         </Grid>
     </Grid>
 </UserControl>

@@ -8,16 +8,10 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Статус -->
+        <!-- Статус: адаптивный -->
         <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,14" Background="{StaticResource BgDarkBrush}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0">
+            <WrapPanel>
+                <StackPanel MinWidth="180" Margin="0,0,24,0">
                     <TextBlock Text="Режим Wi-Fi"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{StaticResource TextSecondaryBrush}" />
@@ -28,7 +22,7 @@
                                Margin="0,4,0,0" />
                 </StackPanel>
 
-                <StackPanel Grid.Column="1">
+                <StackPanel MinWidth="180" Margin="0,0,24,0">
                     <TextBlock Text="Активная сеть"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{StaticResource TextSecondaryBrush}" />
@@ -39,7 +33,7 @@
                                Margin="0,4,0,0" />
                 </StackPanel>
 
-                <StackPanel Grid.Column="2">
+                <StackPanel MinWidth="180">
                     <TextBlock Text="IP-адрес робота"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{StaticResource TextSecondaryBrush}" />
@@ -49,13 +43,13 @@
                                Foreground="{StaticResource TextPrimaryBrush}"
                                Margin="0,4,0,0" />
                 </StackPanel>
-            </Grid>
+            </WrapPanel>
         </Border>
 
         <!-- Список сетей + добавление -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="400" />
+                <ColumnDefinition Width="*" MinWidth="360" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
@@ -90,7 +84,6 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
 
                                             <StackPanel Grid.Column="0">
@@ -115,7 +108,7 @@
                                                            Margin="0,4,0,0" />
                                             </StackPanel>
 
-                                            <Button Grid.Column="2"
+                                            <Button Grid.Column="1"
                                                     Content="Удалить"
                                                     Style="{StaticResource DangerButton}"
                                                     FontSize="{StaticResource FontSizeCaption}"
@@ -132,7 +125,7 @@
             </Border>
 
             <!-- Добавление сети -->
-            <Border Grid.Column="1" Style="{StaticResource CardPanel}" MinWidth="320" MaxWidth="400">
+            <Border Grid.Column="1" Style="{StaticResource CardPanel}" MinWidth="300" MaxWidth="380">
                 <StackPanel>
                     <TextBlock Text="Добавить сеть"
                                FontSize="{StaticResource FontSizeTitle}"
