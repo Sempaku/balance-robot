@@ -256,7 +256,7 @@ public sealed class DualSenseInput : IDisposable
 
             result.Add(new GamepadCandidate(
                 path, vid, pid,
-                path.Contains("bthenum", StringComparison.OrdinalIgnoreCase),
+                WinHid.IsBluetoothPath(path),
                 isGamepad, isDualSense, writable));
         }
 
@@ -389,7 +389,7 @@ public sealed class DualSenseInput : IDisposable
         // USB предпочтительнее BT; игровой интерфейс (usage Game Pad) —
         // приоритетнее прочих коллекций того же устройства
         return paths
-            .OrderBy(p => p.Contains("bthenum", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+            .OrderBy(p => WinHid.IsBluetoothPath(p) ? 1 : 0)
             .ToList();
     }
 
@@ -399,7 +399,7 @@ public sealed class DualSenseInput : IDisposable
     /// </summary>
     private bool TryConnectTo(string path)
     {
-        bool isBt = path.Contains("bthenum", StringComparison.OrdinalIgnoreCase);
+        bool isBt = WinHid.IsBluetoothPath(path);
 
         var handle = WinHid.Open(path, writeAccess: true);
         EffectsSupported = !handle.IsInvalid;
@@ -490,10 +490,11 @@ public sealed class DualSenseInput : IDisposable
 
     private static string ShortPath(string path)
     {
-        // "\\?\hid#vid_054c&pid_0ce6&mi_03#8&1f417723..." -> "vid_054c&pid_0ce6&mi_03"
+        // USB: "\\?\hid#vid_054c&pid_0ce6&mi_03#8&..." -> "vid_054c&pid_0ce6&mi_03"
+        // BT:  "\\?\hid#{00001124-...}_vid&0002054c_pid&0ce6#8&..." -> "vid&0002054c_pid&0ce6"
         var match = System.Text.RegularExpressions.Regex.Match(
             path,
-            @"vid_[0-9a-f]{4}&pid_[0-9a-f]{4}(&mi_\d+)?",
+            @"vid[&_][0-9a-f]{4,8}[&_]pid[&_][0-9a-f]{4}(&mi_\d+)?",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         return match.Success ? match.Value : path;
     }
@@ -516,14 +517,15 @@ public sealed class DualSenseInput : IDisposable
     {
         // Раскладки из SDL2 (SDL_hidapi_ps5.c), смещения от начала отчёта:
         // USB  0x01 (64 байта): стики @1..4, триггеры @5..6, кнопки @8..10
-        // BT   0x31 (78 байт):  стики @3..6, триггеры @7..8, кнопки @10..12
+        // BT   0x31 (78 байт):  заголовок 0x31+seq, затем как в USB: стики @2..5,
+        //                      триггеры @6..7, кнопки @9..11
         // BT   0x01 (simple):   стики @1..4, кнопки @5..7,   триггеры @8..9
         int sticks, triggers, buttons;
         if (d[0] == ReportBtEffects && len >= 13)
         {
-            sticks = 3;
-            triggers = 7;
-            buttons = 10;
+            sticks = 2;
+            triggers = 6;
+            buttons = 9;
         }
         else if (d[0] == ReportState && Transport == DualSenseTransport.Usb && len >= 11)
         {
@@ -650,16 +652,12 @@ public sealed class DualSenseInput : IDisposable
             data[e + EffRumbleLeft] = _rumbleLeft;
         }
 
+        // BT-геймпад рвёт соединение, получив отчёт с битом сброса анимации (0x08).
+        // Этот бит нужен только один раз — сразу после завершения начальной
+        // 3-секундной анимации подключения. Для уже работающего соединения
+        // достаточно просто установить цвет — геймпад его примет без обрыва.
         if (DateTime.UtcNow >= _ledReadyAt)
         {
-            if (!_ledResetDone)
-            {
-                // Сброс анимации подключения — отдельным отчётом, как в SDL2
-                data[e + EffEnableBits2] |= 0x08;
-                _ledResetDone = true;
-                return data;
-            }
-
             data[e + EffEnableBits2] |= 0x04; // цвет lightbar
             data[e + EffLedRed] = _ledR;
             data[e + EffLedGreen] = _ledG;

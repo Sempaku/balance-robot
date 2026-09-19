@@ -56,15 +56,22 @@ pub fn run(
     let saved = Arc::new(AtomicBool::new(false));
     let _server = serve(storage.clone(), saved.clone(), visible, ssid)?;
 
-    let started = Instant::now();
-    while !saved.load(Ordering::Acquire) && started.elapsed() < PORTAL_TIMEOUT {
+    // Дедлайн, а не фиксированный отрезок: пока к точке подключён клиент
+    // (открыл форму и заполняет её), таймаут откладывается. Иначе каждые
+    // 300 секунд точка падает на ~13 секунд и «Сохранить» в этот промежуток
+    // обрывается ошибкой соединения в браузере.
+    let mut deadline = Instant::now() + PORTAL_TIMEOUT;
+    while !saved.load(Ordering::Acquire) && Instant::now() < deadline {
         std::thread::sleep(Duration::from_millis(200));
+        if ap_station_count() > 0 {
+            deadline = Instant::now() + PORTAL_TIMEOUT;
+        }
     }
 
     if saved.load(Ordering::Acquire) {
         log::info!("Портал: сеть сохранена, подключаюсь");
     } else {
-        log::info!("Портал: никто не подключился, пробую известные сети ещё раз");
+        log::info!("Портал: клиенты отсоединились или время вышло, пробую известные сети ещё раз");
     }
 
     // Сервер и точка доступа должны исчезнуть до попытки стать станцией,
@@ -86,6 +93,20 @@ fn scan_ssids(wifi: &mut BlockingWifi<EspWifi<'static>>) -> Vec<String> {
     names.sort();
     names.dedup();
     names
+}
+
+/// Сколько станций сейчас подключено к точке доступа робота.
+fn ap_station_count() -> usize {
+    let mut list = esp_idf_svc::sys::wifi_sta_list_t::default();
+    // SAFETY: функция только заполняет переданную структуру; драйвер Wi-Fi
+    // к этому моменту уже запущен в режиме AP.
+    let ok = unsafe { esp_idf_svc::sys::esp_wifi_ap_get_sta_list(&mut list) }
+        == esp_idf_svc::sys::ESP_OK;
+    if ok {
+        list.num.max(0) as usize
+    } else {
+        0
+    }
 }
 
 fn serve(
@@ -159,8 +180,15 @@ fn store_network(storage: &Storage, network: WifiNetwork) -> anyhow::Result<Stri
     networks.retain(|n| n.ssid != network.ssid);
     let ssid = network.ssid.clone();
     // Введённая вручную сеть — самая свежая информация о месте, где робот
-    // находится сейчас, поэтому пробовать её нужно первой.
-    let top = networks.iter().map(|n| n.priority).max().unwrap_or(0);
+    // находится сейчас, поэтому пробовать её нужно первой. Максимум берём
+    // по всем известным сетям, включая зашитые: иначе зашитая с высоким
+    // приоритетом навсегда обгонит только что введённую.
+    let top = storage
+        .all_known_networks()
+        .iter()
+        .map(|n| n.priority)
+        .max()
+        .unwrap_or(0);
     networks.push(WifiNetwork {
         priority: top + 1,
         ..network

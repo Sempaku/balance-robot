@@ -96,9 +96,26 @@ internal static class WinHid
     [DllImport("hid.dll", SetLastError = true)]
     private static extern bool HidD_FreePreparsedData(IntPtr preparsedData);
 
+    // USB:  vid_054c&pid_0ce6
+    // BT:    vid&0002054c_pid&0ce6 (0002 — источник Vendor ID, отбрасывается)
     private static readonly Regex VidPidRegex = new(
-        @"vid_([0-9a-f]{4})&pid_([0-9a-f]{4})",
+        @"vid[&_][0-9a-f]*?([0-9a-f]{4})[&_]pid[&_]([0-9a-f]{4})",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// UUID сервиса HID-over-Bluetooth: присутствует в пути интерфейса
+    /// BT-геймпада (USB-пути его не содержат).
+    /// </summary>
+    private const string BluetoothHidServiceUuid = "{00001124-0000-1000-8000-00805f9b34fb}";
+
+    /// <summary>
+    /// Путь принадлежит Bluetooth-устройству (а не USB).
+    /// </summary>
+    public static bool IsBluetoothPath(string path)
+    {
+        return path.Contains("bthenum", StringComparison.OrdinalIgnoreCase)
+            || path.Contains(BluetoothHidServiceUuid, StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Все пути HID-интерфейсов в системе: SetupAPI + реестр DeviceClasses.
@@ -126,13 +143,16 @@ internal static class WinHid
     }
 
     /// <summary>
-    /// Пути HID-устройств с заданным VID/PID.
+    /// Пути HID-устройств с заданным VID/PID (USB и Bluetooth).
     /// </summary>
     public static List<string> EnumeratePaths(ushort vid, ushort pid)
     {
-        string needle = $"vid_{vid:x4}&pid_{pid:x4}";
         return EnumerateAllPaths()
-            .Where(p => p.Contains(needle, StringComparison.OrdinalIgnoreCase))
+            .Where(p =>
+            {
+                var (v, p2) = ParseVidPid(p);
+                return v == vid && p2 == pid;
+            })
             .ToList();
     }
 
