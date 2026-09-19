@@ -212,6 +212,10 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Width" Value="8" />
         </Style>
+
+        <!-- ===== Converters (доступны глобально во всех Views) ===== -->
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis" xmlns:local="clr-namespace:BalanceBot.Desktop" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -9,11 +9,6 @@
         Background="{StaticResource BgDarkBrush}"
         WindowStartupLocation="CenterScreen">
 
-    <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis" />
-        <local:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis" />
-    </Window.Resources>
-
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
