@@ -13,16 +13,16 @@
     <Color x:Key="PlotGyroColor">#00D084</Color>
     <Color x:Key="PlotTrimColor">#E8ECF1</Color>
     <Color x:Key="PlotAccelAngleColor">#80D8FF</Color>
-    <Color x:Key="PlotLeanColor">#FF6D00</Color>
+    <Color x:Key="PlotLeanColor">#FFA502</Color>
 
     <!-- Каналы моторов -->
-    <Color x:Key="PlotCmdColor">#FFA502</Color>
+    <Color x:Key="PlotCmdColor">#FFB300</Color>
     <Color x:Key="PlotWheelRateColor">#B388FF</Color>
     <Color x:Key="PlotTermPColor">#FF4081</Color>
     <Color x:Key="PlotTermDColor">#78909C</Color>
 
     <!-- Bode / BlackBox -->
-    <Color x:Key="PlotTrimSignalColor">#FFA502</Color>
+    <Color x:Key="PlotTrimSignalColor">#FFB300</Color>
     <Color x:Key="PlotLoopMagColor">#4A90FF</Color>
     <Color x:Key="PlotClosedMagColor">#78909C</Color>
     <Color x:Key="PlotLoopPhaseColor">#00D084</Color>

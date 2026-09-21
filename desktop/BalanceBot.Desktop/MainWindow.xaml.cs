@@ -24,10 +24,30 @@ public partial class MainWindow : Window
         Loaded += OnLoaded;
         KeyDown += OnWindowKeyDown;
         KeyUp += OnWindowKeyUp;
+        
+        // Подписка на события навигации
+        DashboardNav.Checked += OnNavigationChanged;
+        TuningNav.Checked += OnNavigationChanged;
+        ControlNav.Checked += OnNavigationChanged;
+        WifiNav.Checked += OnNavigationChanged;
+        BlackBoxNav.Checked += OnNavigationChanged;
+        BodeNav.Checked += OnNavigationChanged;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        // Применяем тему при запуске
+        ApplyTheme(_vm.CurrentTheme);
+        
+        // Подписываемся на изменение темы
+        _vm.PropertyChanged += (s, args) =>
+        {
+            if (args.PropertyName == nameof(_vm.CurrentTheme))
+            {
+                ApplyTheme(_vm.CurrentTheme);
+            }
+        };
+        
         // Даём UI время отрисовать вкладки, затем настраиваем графики
         Dispatcher.BeginInvoke(() =>
         {
@@ -390,6 +410,59 @@ public partial class MainWindow : Window
         {
             _vm.Control?.UpdateKey(isDown, w, s, a, d);
         }
+    }
+    
+    private void OnNavigationChanged(object sender, RoutedEventArgs e)
+    {
+        // Скрываем все представления
+        DashboardView.Visibility = Visibility.Collapsed;
+        TuningView.Visibility = Visibility.Collapsed;
+        ControlView.Visibility = Visibility.Collapsed;
+        WifiView.Visibility = Visibility.Collapsed;
+        BlackBoxView.Visibility = Visibility.Collapsed;
+        BodeView.Visibility = Visibility.Collapsed;
+        
+        // Показываем выбранное представление
+        if (sender == DashboardNav)
+        {
+            DashboardView.Visibility = Visibility.Visible;
+        }
+        else if (sender == TuningNav)
+        {
+            TuningView.Visibility = Visibility.Visible;
+        }
+        else if (sender == ControlNav)
+        {
+            ControlView.Visibility = Visibility.Visible;
+        }
+        else if (sender == WifiNav)
+        {
+            WifiView.Visibility = Visibility.Visible;
+        }
+        else if (sender == BlackBoxNav)
+        {
+            BlackBoxView.Visibility = Visibility.Visible;
+        }
+        else if (sender == BodeNav)
+        {
+            BodeView.Visibility = Visibility.Visible;
+        }
+    }
+    
+    private void ApplyTheme(string theme)
+    {
+        var merged = Application.Current.Resources.MergedDictionaries;
+
+        // [0] — активная тема, [1] — PlotColors (не трогаем: цвета графиков от темы не зависят)
+        var themeDict = new ResourceDictionary
+        {
+            Source = new Uri(theme == "Light"
+                ? "pack://application:,,,/BalanceBot.Desktop;component/Theme/LightTheme.xaml"
+                : "pack://application:,,,/BalanceBot.Desktop;component/Theme/DarkTheme.xaml")
+        };
+
+        merged.RemoveAt(0);
+        merged.Insert(0, themeDict);
     }
 }
 

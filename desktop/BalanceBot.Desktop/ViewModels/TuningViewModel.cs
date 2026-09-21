@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using BalanceBot.Core;
 using BalanceBot.Core.Analysis;
 using BalanceBot.Core.Tuning;
@@ -18,6 +18,10 @@ public sealed partial class TuningViewModel : ObservableObject
     private static readonly TimeSpan SettleAfterAdjust = TimeSpan.FromMilliseconds(2500);
     private const int MaxIterations = 4;
 
+    // Автоприменение изменений на лету: после отпускания слайдера ждём 400 мс
+    // и применяем скопом (одна TCP-транзакция вместо потока на каждый пиксель)
+    private const int AutoApplyDelayMs = 400;
+
     // Целевой запас по фазе: ниже 40° — звенит, выше 65° — вялое управление
     private const double TargetPmMin = 40.0;
     private const double TargetPmMax = 65.0;
@@ -28,7 +32,9 @@ public sealed partial class TuningViewModel : ObservableObject
 
     public ObservableCollection<ParamItemViewModel> Parameters { get; } = new();
 
-    [ObservableProperty] private string _statusMessage = "Готово к настройке";
+    private CancellationTokenSource? _autoApplyCts;
+
+    [ObservableProperty] private string _statusMessage = "Готово к настройке: двигайте слайдеры — изменения уходят на робота на лету";
     [ObservableProperty] private bool _isBusy;
 
     [ObservableProperty] private bool _isAutotuneRunning;
@@ -57,14 +63,63 @@ public sealed partial class TuningViewModel : ObservableObject
             var vm = new ParamItemViewModel(item, cur, val =>
             {
                 _paramManager.SetLocal(item.Key, val);
+                ScheduleAutoApply();
             });
             Parameters.Add(vm);
         }
     }
 
+    /// <summary>
+    /// Автоприменение на лету: слайдер отпущен — через 400 мс изменения уходят
+    /// на робота одним пакетом. Кнопка «Применить (RAM)» делает то же немедленно.
+    /// </summary>
+    private void ScheduleAutoApply()
+    {
+        _autoApplyCts?.Cancel();
+        _autoApplyCts = new CancellationTokenSource();
+        var token = _autoApplyCts.Token;
+        _ = AutoApplyAsync(token);
+    }
+
+    private async Task AutoApplyAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(AutoApplyDelayMs, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (token.IsCancellationRequested || _paramManager.ModifiedValues.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            bool ok = await _paramManager.ApplyModifiedAsync();
+            StatusMessage = ok
+                ? "Изменения применены на лету (RAM). Для фиксации нажмите «Сохранить в NVS»."
+                : "Робот не принял изменения — проверьте связь и повторите.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка автоприменения: {ex.Message}";
+        }
+    }
+
+    private void CancelAutoApply()
+    {
+        _autoApplyCts?.Cancel();
+        _autoApplyCts = null;
+    }
+
     [RelayCommand]
     public async Task ApplyAsync()
     {
+        CancelAutoApply();
         IsBusy = true;
         StatusMessage = "Применение параметров в RAM...";
         try
@@ -85,6 +140,7 @@ public sealed partial class TuningViewModel : ObservableObject
     [RelayCommand]
     public async Task SaveToNvsAsync()
     {
+        CancelAutoApply();
         IsBusy = true;
         StatusMessage = "Сохранение параметров в NVS память робота...";
         try
@@ -105,6 +161,7 @@ public sealed partial class TuningViewModel : ObservableObject
     [RelayCommand]
     public async Task ResetToDefaultsAsync()
     {
+        CancelAutoApply();
         IsBusy = true;
         StatusMessage = "Сброс к заводским настройкам...";
         try
@@ -256,7 +313,7 @@ public sealed partial class TuningViewModel : ObservableObject
                 : "запас по фазе: не измерен";
 
             AutotuneStatusText = "Автонастройка завершена! Проверьте робота: погоняйте, наклоните. " +
-                "Стабильно → «💾 Сохранить в NVS», иначе → «↩ Откатить».";
+                "Стабильно → «Сохранить в NVS», иначе → « Откатить».";
             AutotuneResultText =
                 $"Ka: {oldKa:F0} → {newKaVal:F0}   Kd: {oldKd:F0} → {newKdVal:F0}   Ki: {oldKi:F1} → {newKiVal:F1}\n" +
                 $"{pmReport}" +
@@ -282,6 +339,7 @@ public sealed partial class TuningViewModel : ObservableObject
     {
         if (_preAutotuneValues == null || _preAutotuneValues.Count == 0) return;
 
+        CancelAutoApply();
         IsBusy = true;
         try
         {
@@ -330,6 +388,27 @@ public sealed class ParamItemViewModel : ObservableObject
     private float _currentValue;
 
     public ParamCatalogItem Meta { get; }
+
+    /// <summary>Шаг стрелками клавиатуры: 1% диапазона.</summary>
+    public double SmallChange => Math.Max((Meta.Max - Meta.Min) / 100.0, 1e-6);
+
+    /// <summary>Шаг кликом по треку: 10% диапазона.</summary>
+    public double LargeChange => Math.Max((Meta.Max - Meta.Min) / 10.0, 1e-5);
+
+    /// <summary>Знаков после запятой для всплывающей подсказки слайдера.</summary>
+    public int AutoToolTipPrecision
+    {
+        get
+        {
+            double range = Meta.Max - Meta.Min;
+            if (range < 0.01) return 6;
+            if (range < 0.1) return 5;
+            if (range < 1.0) return 4;
+            if (range < 10.0) return 2;
+            if (range < 100.0) return 1;
+            return 0;
+        }
+    }
 
     public float CurrentValue
     {

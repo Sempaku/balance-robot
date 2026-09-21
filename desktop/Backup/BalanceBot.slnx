@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="BalanceBot.Core/BalanceBot.Core.csproj" />
+  <Project Path="BalanceBot.Desktop/BalanceBot.Desktop.csproj" />
+  <Project Path="BalanceBot.Protocol/BalanceBot.Protocol.csproj" />
+  <Project Path="BalanceBot.Transport/BalanceBot.Transport.csproj" />
+</Solution>

@@ -35,6 +35,7 @@ public sealed partial class BodeViewModel : ObservableObject
     [ObservableProperty] private bool _hasResult;
 
     private BodeResult? _lastResult;
+    private CancellationTokenSource? _testCts;
 
     public BodeViewModel(RobotSession session)
     {
@@ -56,9 +57,12 @@ public sealed partial class BodeViewModel : ObservableObject
         HasResult = false;
         StatusMessage = "Тест идёт: не трогайте робот и трим...";
 
+        _testCts?.Dispose();
+        _testCts = new CancellationTokenSource();
+
         try
         {
-            var capture = await _testRunner.RunAsync(PulseAmplitude);
+            var capture = await _testRunner.RunAsync(PulseAmplitude, _testCts.Token);
 
             if (capture == null)
             {
@@ -111,14 +115,19 @@ public sealed partial class BodeViewModel : ObservableObject
         }
         finally
         {
+            _testCts?.Dispose();
+            _testCts = null;
             IsRunning = false;
         }
     }
 
+    /// <summary>
+    /// Прерывание текущего теста: отменяет ожидание фаз и запись отклика.
+    /// </summary>
     [RelayCommand]
     public void StopTest()
     {
-        // Тест короткий (~6.5 с) и безопасный: прерывание не требуется
+        _testCts?.Cancel();
     }
 
     [RelayCommand]

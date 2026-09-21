@@ -3,20 +3,24 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:BalanceBot.Desktop.Controls">
 
-    <Border Style="{StaticResource CardPanel}" Padding="12,10">
+    <Border Background="{DynamicResource Primary700Brush}"
+            BorderBrush="{DynamicResource Primary500Brush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="14,12">
         <StackPanel>
             <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=local:MetricCard}}"
-                       FontSize="{StaticResource FontSizeCaption}"
-                       Foreground="{StaticResource TextSecondaryBrush}"
+                       FontSize="{DynamicResource FontSizeCaption}"
+                       Foreground="{DynamicResource TextLowEmphasisBrush}"
                        TextTrimming="CharacterEllipsis" />
             <ContentControl Content="{Binding ValueContent, RelativeSource={RelativeSource AncestorType=local:MetricCard}}"
-                            Margin="0,4,0,0">
+                            Margin="0,6,0,0">
                 <ContentControl.ContentTemplate>
                     <DataTemplate>
                         <TextBlock Text="{Binding}"
-                                   FontSize="{StaticResource FontSizeHeadline}"
+                                   FontSize="{DynamicResource FontSizeHeadline}"
                                    FontWeight="Bold"
-                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=local:MetricCard}}"
+                                   Foreground="{Binding ValueForeground, RelativeSource={RelativeSource AncestorType=local:MetricCard}, TargetNullValue={StaticResource TextHighEmphasisBrush}}"
                                    TextTrimming="CharacterEllipsis" />
                     </DataTemplate>
                 </ContentControl.ContentTemplate>

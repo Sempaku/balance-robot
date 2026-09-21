@@ -10,64 +10,71 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Панель управления тестом -->
-        <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,12">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+        <!-- Панель управления тестом с улучшенным оформлением -->
+        <Border Grid.Row="0" 
+                Background="{DynamicResource Primary700Brush}"
+                BorderBrush="{DynamicResource Primary500Brush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Margin="0,0,0,14">
+            <WrapPanel Margin="16">
+                <StackPanel MinWidth="240" MaxWidth="520" VerticalAlignment="Center" Margin="0,4,24,4">
                     <TextBlock Text="{Binding StatusMessage}"
-                               FontSize="{StaticResource FontSizeCaption}"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
-                               Foreground="{StaticResource AccentBrush}"
+                               Foreground="{DynamicResource Accent500Brush}"
                                TextWrapping="Wrap" />
                     <TextBlock Text="Тест подаёт короткий импульс трима и записывает отклик угла: АЧХ/ФЧХ через БПФ, запасы по фазе и усилению."
-                               FontSize="{StaticResource FontSizeCaption}"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               Margin="0,2,0,0" />
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               Foreground="{DynamicResource TextLowEmphasisBrush}"
+                               Margin="0,4,0,0"
+                               TextWrapping="Wrap" />
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <StackPanel Margin="0,0,14,0" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4,0,4">
+                    <StackPanel Margin="0,0,16,0" VerticalAlignment="Center">
                         <TextBlock Text="Амплитуда импульса"
-                                   FontSize="{StaticResource FontSizeCaption}"
-                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                                   FontSize="{DynamicResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextLowEmphasisBrush}" />
                         <StackPanel Orientation="Horizontal">
                             <Slider Minimum="0.3" Maximum="3.0"
                                     Value="{Binding PulseAmplitude}"
                                     SmallChange="0.1" LargeChange="0.5"
-                                    Width="110" VerticalAlignment="Center" />
+                                    IsMoveToPointEnabled="True"
+                                    Width="120"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource ModernSlider}" />
                             <TextBlock Text="{Binding PulseAmplitude, StringFormat={}{0:F1}°}"
-                                       FontSize="{StaticResource FontSizeBody}"
+                                       FontSize="{DynamicResource FontSizeBody}"
                                        FontWeight="Bold"
-                                       Foreground="{StaticResource WarningBrush}"
-                                       Margin="8,0,0,0" VerticalAlignment="Center" />
+                                       Foreground="{DynamicResource Warning500Brush}"
+                                       Margin="10,0,0,0"
+                                       VerticalAlignment="Center" />
                         </StackPanel>
                     </StackPanel>
 
                     <Button Content="&#xE768; Запустить тест"
                             Style="{StaticResource ModernButton}"
-                            FontSize="{StaticResource FontSizeCaption}"
+                            FontSize="{DynamicResource FontSizeCaption}"
                             Command="{Binding RunTestCommand}"
                             Visibility="{Binding IsRunning, Converter={StaticResource InverseBoolToVis}}"
-                            Margin="0,0,8,0" Padding="16,10" />
+                            Margin="0,0,10,0"
+                            Padding="18,12" />
                     <Button Content="&#xE71A; Прервать"
                             Style="{StaticResource DangerButton}"
-                            FontSize="{StaticResource FontSizeCaption}"
+                            FontSize="{DynamicResource FontSizeCaption}"
                             Command="{Binding StopTestCommand}"
                             Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}"
-                            Margin="0,0,8,0" Padding="16,10" />
+                            Margin="0,0,10,0"
+                            Padding="18,12" />
                     <Button Content="&#xE74E; Экспорт CSV"
                             Style="{StaticResource SecondaryButton}"
-                            FontSize="{StaticResource FontSizeCaption}"
+                            FontSize="{DynamicResource FontSizeCaption}"
                             Command="{Binding ExportCsvCommand}"
                             IsEnabled="{Binding HasResult}"
-                            Padding="14,10" />
+                            Padding="16,12" />
                 </StackPanel>
-            </Grid>
+            </WrapPanel>
         </Border>
 
         <!-- Запасы + графики -->
@@ -78,41 +85,92 @@
             </Grid.RowDefinitions>
 
             <!-- Карточки запасов: адаптивные -->
-            <WrapPanel Grid.Row="0" Margin="0,0,0,12">
+            <WrapPanel Grid.Row="0" Margin="0,0,0,14">
                 <ctrl:MetricCard Title="Запас по усилению"
                                  ValueContent="{Binding GainMarginText}"
-                                 ValueForeground="{StaticResource SuccessBrush}"
-                                 MinWidth="160" Margin="0,0,6,6" />
+                                 ValueForeground="{DynamicResource Success500Brush}"
+                                 MinWidth="170" 
+                                 Margin="0,0,8,8" />
                 <ctrl:MetricCard Title="Запас по фазе"
                                  ValueContent="{Binding PhaseMarginText}"
-                                 ValueForeground="{StaticResource SuccessBrush}"
-                                 MinWidth="160" Margin="0,0,6,6" />
+                                 ValueForeground="{DynamicResource Success500Brush}"
+                                 MinWidth="170" 
+                                 Margin="0,0,8,8" />
                 <ctrl:MetricCard Title="Частота среза"
                                  ValueContent="{Binding CrossoverText}"
-                                 ValueForeground="{StaticResource AccentBrush}"
-                                 MinWidth="160" Margin="0,0,6,6" />
+                                 ValueForeground="{DynamicResource Accent500Brush}"
+                                 MinWidth="170" 
+                                 Margin="0,0,8,8" />
                 <ctrl:MetricCard Title="Резонанс |T|"
                                  ValueContent="{Binding PeakText}"
-                                 ValueForeground="{StaticResource WarningBrush}"
-                                 MinWidth="160" Margin="0,0,0,6" />
+                                 ValueForeground="{DynamicResource Warning500Brush}"
+                                 MinWidth="170" 
+                                 Margin="0,0,0,8" />
             </WrapPanel>
 
-            <!-- Графики: адаптивная сетка -->
+            <!-- Графики: адаптивная сетка с улучшенным оформлением -->
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                 <UniformGrid Columns="1">
-                    <Border Style="{StaticResource CardPanel}" Margin="0,0,0,8" Padding="4" MinHeight="250">
-                        <ScottPlot:WpfPlot x:Name="PlotStepResponse" />
+                    <Border Background="{DynamicResource Primary700Brush}"
+                            BorderBrush="{DynamicResource Primary500Brush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Margin="0,0,0,10" 
+                            Padding="6" 
+                            MinHeight="260">
+                        <Grid>
+                            <ScottPlot:WpfPlot x:Name="PlotStepResponse" />
+                            <TextBlock Text="Отклик на импульс трима"
+                                       FontSize="{DynamicResource FontSizeCaption}"
+                                       Foreground="{DynamicResource TextMediumEmphasisBrush}"
+                                       HorizontalAlignment="Left" 
+                                       VerticalAlignment="Top"
+                                       Margin="10,6,0,0" />
+                        </Grid>
                     </Border>
+                    
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Style="{StaticResource CardPanel}" Margin="0,0,3,0" Padding="4" MinHeight="250">
-                            <ScottPlot:WpfPlot x:Name="PlotBodeMag" />
+                        
+                        <Border Grid.Column="0" 
+                                Background="{DynamicResource Primary700Brush}"
+                                BorderBrush="{DynamicResource Primary500Brush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Margin="0,0,5,0" 
+                                Padding="6" 
+                                MinHeight="260">
+                            <Grid>
+                                <ScottPlot:WpfPlot x:Name="PlotBodeMag" />
+                                <TextBlock Text="АЧХ контура |L| (дБ)"
+                                           FontSize="{DynamicResource FontSizeCaption}"
+                                           Foreground="{DynamicResource TextMediumEmphasisBrush}"
+                                           HorizontalAlignment="Left" 
+                                           VerticalAlignment="Top"
+                                           Margin="10,6,0,0" />
+                            </Grid>
                         </Border>
-                        <Border Grid.Column="1" Style="{StaticResource CardPanel}" Margin="3,0,0,0" Padding="4" MinHeight="250">
-                            <ScottPlot:WpfPlot x:Name="PlotBodePhase" />
+                        
+                        <Border Grid.Column="1" 
+                                Background="{DynamicResource Primary700Brush}"
+                                BorderBrush="{DynamicResource Primary500Brush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Margin="5,0,0,0" 
+                                Padding="6" 
+                                MinHeight="260">
+                            <Grid>
+                                <ScottPlot:WpfPlot x:Name="PlotBodePhase" />
+                                <TextBlock Text="ФЧХ контура ∠L (°)"
+                                           FontSize="{DynamicResource FontSizeCaption}"
+                                           Foreground="{DynamicResource TextMediumEmphasisBrush}"
+                                           HorizontalAlignment="Left" 
+                                           VerticalAlignment="Top"
+                                           Margin="10,6,0,0" />
+                            </Grid>
                         </Border>
                     </Grid>
                 </UniformGrid>

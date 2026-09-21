@@ -1,0 +1,93 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- ===== Цветовая палитра темной темы ===== -->
+    <!-- Основные цвета -->
+    <Color x:Key="Primary900">#0A0C10</Color>
+    <Color x:Key="Primary800">#0D0F14</Color>
+    <Color x:Key="Primary700">#161A22</Color>
+    <Color x:Key="Primary600">#1E232E</Color>
+    <Color x:Key="Primary500">#2A3040</Color>
+    
+    <!-- Акцентные цвета -->
+    <Color x:Key="Accent500">#4A90FF</Color>
+    <Color x:Key="Accent400">#5CA0FF</Color>
+    <Color x:Key="Accent300">#6EB0FF</Color>
+    
+    <!-- Состояния -->
+    <Color x:Key="Success500">#00D084</Color>
+    <Color x:Key="Warning500">#FFA502</Color>
+    <Color x:Key="Danger500">#FF4757</Color>
+    
+    <!-- Цвета текста -->
+    <Color x:Key="TextHighEmphasis">#FFFFFF</Color>
+    <Color x:Key="TextMediumEmphasis">#E8ECF1</Color>
+    <Color x:Key="TextLowEmphasis">#8B95A5</Color>
+    
+    <!-- Совместимость с существующим кодом -->
+    <Color x:Key="BgDarkColor">#0D0F14</Color>
+    <Color x:Key="BgCardColor">#161A22</Color>
+    <Color x:Key="BgCardHoverColor">#1E232E</Color>
+    <Color x:Key="BorderColor">#2A3040</Color>
+    <Color x:Key="AccentColor">#4A90FF</Color>
+    <Color x:Key="SuccessColor">#00D084</Color>
+    <Color x:Key="DangerColor">#FF4757</Color>
+    <Color x:Key="WarningColor">#FFA502</Color>
+    <Color x:Key="TextPrimaryColor">#E8ECF1</Color>
+    <Color x:Key="TextSecondaryColor">#8B95A5</Color>
+    
+    <!-- Кисти -->
+    <SolidColorBrush x:Key="Primary900Brush" Color="{StaticResource Primary900}" />
+    <SolidColorBrush x:Key="Primary800Brush" Color="{StaticResource Primary800}" />
+    <SolidColorBrush x:Key="Primary700Brush" Color="{StaticResource Primary700}" />
+    <SolidColorBrush x:Key="Primary600Brush" Color="{StaticResource Primary600}" />
+    <SolidColorBrush x:Key="Primary500Brush" Color="{StaticResource Primary500}" />
+    
+    <SolidColorBrush x:Key="Accent500Brush" Color="{StaticResource Accent500}" />
+    <SolidColorBrush x:Key="Accent400Brush" Color="{StaticResource Accent400}" />
+    <SolidColorBrush x:Key="Accent300Brush" Color="{StaticResource Accent300}" />
+    
+    <SolidColorBrush x:Key="Success500Brush" Color="{StaticResource Success500}" />
+    <SolidColorBrush x:Key="Warning500Brush" Color="{StaticResource Warning500}" />
+    <SolidColorBrush x:Key="Danger500Brush" Color="{StaticResource Danger500}" />
+    
+    <SolidColorBrush x:Key="TextHighEmphasisBrush" Color="{StaticResource TextHighEmphasis}" />
+    <SolidColorBrush x:Key="TextMediumEmphasisBrush" Color="{StaticResource TextMediumEmphasis}" />
+    <SolidColorBrush x:Key="TextLowEmphasisBrush" Color="{StaticResource TextLowEmphasis}" />
+
+    <!-- Кнопки-подложки и выделение -->
+    <SolidColorBrush x:Key="SecondaryButtonBrush" Color="#2A303F" />
+    <SolidColorBrush x:Key="SelectionBrush" Color="#2D3A54" />
+    
+    <!-- Совместимость с существующим кодом -->
+    <SolidColorBrush x:Key="BgDarkBrush" Color="{StaticResource BgDarkColor}" />
+    <SolidColorBrush x:Key="BgCardBrush" Color="{StaticResource BgCardColor}" />
+    <SolidColorBrush x:Key="BgCardHoverBrush" Color="{StaticResource BgCardHoverColor}" />
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
+    
+    <!-- ===== Размеры шрифтов ===== -->
+    <sys:Double x:Key="FontSizeCaption">11</sys:Double>
+    <sys:Double x:Key="FontSizeBody">13</sys:Double>
+    <sys:Double x:Key="FontSizeTitle">15</sys:Double>
+    <sys:Double x:Key="FontSizeHeadline">20</sys:Double>
+    
+    <!-- ===== Базовые стили ===== -->
+    <Style TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Segoe Fluent Icons, Segoe MDL2 Assets, Arial Unicode MS, sans-serif" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+        <Setter Property="Foreground" Value="{StaticResource TextMediumEmphasisBrush}" />
+    </Style>
+
+    <Style TargetType="UserControl">
+        <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI, Segoe UI Emoji, Segoe UI Symbol, Segoe Fluent Icons, Segoe MDL2 Assets, Arial Unicode MS, sans-serif" />
+        <Setter Property="Foreground" Value="{StaticResource TextMediumEmphasisBrush}" />
+    </Style>
+    
+</ResourceDictionary>

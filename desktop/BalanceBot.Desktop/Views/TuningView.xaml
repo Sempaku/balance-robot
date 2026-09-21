@@ -9,9 +9,14 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Панель автонастройки -->
-        <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,12">
-            <Grid>
+        <!-- Панель автонастройки с улучшенным оформлением -->
+        <Border Grid.Row="0" 
+                Background="{DynamicResource Primary700Brush}"
+                BorderBrush="{DynamicResource Primary500Brush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Margin="0,0,0,12">
+            <Grid Margin="16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -21,77 +26,96 @@
                 <Button Grid.Column="0"
                         Content="&#xE9D9; Автотюнинг"
                         Style="{StaticResource ModernButton}"
-                        FontSize="{StaticResource FontSizeBody}"
+                        FontSize="{DynamicResource FontSizeBody}"
                         Command="{Binding RunAutotuneCommand}"
-                        Margin="0,0,14,0" Padding="18,10" VerticalAlignment="Center" />
+                        Margin="0,0,16,0" 
+                        Padding="20,12" 
+                        VerticalAlignment="Center" />
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="{Binding AutotuneStatusText}"
-                               FontSize="{StaticResource FontSizeCaption}"
-                               Foreground="{StaticResource AccentBrush}"
-                               TextWrapping="Wrap" FontWeight="SemiBold" />
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               Foreground="{DynamicResource Accent500Brush}"
+                               TextWrapping="Wrap" 
+                               FontWeight="SemiBold" />
                     <TextBlock Text="{Binding AutotuneResultText}"
-                               FontSize="{StaticResource FontSizeCaption}"
-                               Foreground="{StaticResource SuccessBrush}"
-                               TextWrapping="Wrap" Margin="0,4,0,0"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               Foreground="{DynamicResource Success500Brush}"
+                               TextWrapping="Wrap" 
+                               Margin="0,6,0,0"
                                Visibility="{Binding HasAutotuneResult, Converter={StaticResource BoolToVis}}" />
                 </StackPanel>
 
                 <Button Grid.Column="2"
                         Content="&#xE7A7; Откатить"
                         Style="{StaticResource SecondaryButton}"
-                        FontSize="{StaticResource FontSizeCaption}"
+                        FontSize="{DynamicResource FontSizeCaption}"
                         Command="{Binding RollbackAutotuneCommand}"
                         IsEnabled="{Binding HasAutotuneResult}"
-                        Margin="14,0,0,0" Padding="12,8" VerticalAlignment="Center" />
+                        Margin="16,0,0,0" 
+                        Padding="14,10" 
+                        VerticalAlignment="Center" />
             </Grid>
         </Border>
 
-        <!-- Список параметров -->
-        <Border Grid.Row="1" Style="{StaticResource CardPanel}">
+        <!-- Список параметров с улучшенным оформлением -->
+        <Border Grid.Row="1" 
+                Background="{DynamicResource Primary700Brush}"
+                BorderBrush="{DynamicResource Primary500Brush}"
+                BorderThickness="1"
+                CornerRadius="8">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding Parameters}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,10">
-                                <Grid>
+                            <Border BorderBrush="{DynamicResource Primary600Brush}" 
+                                    BorderThickness="0,0,0,1" 
+                                    Padding="0,12">
+                                <Grid Margin="16,0">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="220" MinWidth="180" />
-                                        <ColumnDefinition Width="*" MinWidth="150" />
-                                        <ColumnDefinition Width="90" MinWidth="80" />
-                                        <ColumnDefinition Width="60" MinWidth="50" />
+                                        <ColumnDefinition Width="240" MinWidth="200" />
+                                        <ColumnDefinition Width="*" MinWidth="180" />
+                                        <ColumnDefinition Width="100" MinWidth="90" />
+                                        <ColumnDefinition Width="70" MinWidth="60" />
                                     </Grid.ColumnDefinitions>
 
                                     <StackPanel Grid.Column="0">
                                         <TextBlock Text="{Binding Meta.Key}"
                                                    FontWeight="Bold"
-                                                   FontSize="{StaticResource FontSizeBody}"
-                                                   Foreground="{StaticResource AccentBrush}" />
+                                                   FontSize="{DynamicResource FontSizeBody}"
+                                                   Foreground="{DynamicResource Accent500Brush}" />
                                         <TextBlock Text="{Binding Meta.About}"
-                                                   FontSize="{StaticResource FontSizeCaption}"
-                                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                                   TextWrapping="Wrap" Margin="0,2,0,0" />
+                                                   FontSize="{DynamicResource FontSizeCaption}"
+                                                   Foreground="{DynamicResource TextLowEmphasisBrush}"
+                                                   TextWrapping="Wrap" 
+                                                   Margin="0,4,0,0" />
                                     </StackPanel>
 
                                     <Slider Grid.Column="1"
                                             Minimum="{Binding Meta.Min}"
                                             Maximum="{Binding Meta.Max}"
                                             Value="{Binding CurrentValue}"
+                                            SmallChange="{Binding SmallChange}"
+                                            LargeChange="{Binding LargeChange}"
+                                            IsMoveToPointEnabled="True"
+                                            AutoToolTipPlacement="TopLeft"
+                                            AutoToolTipPrecision="{Binding AutoToolTipPrecision}"
                                             VerticalAlignment="Center"
-                                            Margin="16,0" />
+                                            Margin="16,0"
+                                            Style="{StaticResource ModernSlider}" />
 
                                     <TextBox Grid.Column="2"
-                                             Text="{Binding CurrentValue, StringFormat={}{0:F4}, UpdateSourceTrigger=PropertyChanged}"
+                                             Text="{Binding CurrentValue, StringFormat={}{0:F4}}"
                                              Style="{StaticResource ModernTextBox}"
                                              VerticalAlignment="Center"
                                              HorizontalContentAlignment="Center" />
 
                                     <TextBlock Grid.Column="3"
                                                Text="{Binding Meta.Unit}"
-                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Foreground="{DynamicResource TextLowEmphasisBrush}"
                                                VerticalAlignment="Center"
-                                               Margin="8,0,0,0"
-                                               FontSize="{StaticResource FontSizeCaption}" />
+                                               Margin="12,0,0,0"
+                                               FontSize="{DynamicResource FontSizeCaption}" />
                                 </Grid>
                             </Border>
                         </DataTemplate>
@@ -100,34 +124,41 @@
             </ScrollViewer>
         </Border>
 
-        <!-- Нижняя панель -->
-        <Border Grid.Row="2" Style="{StaticResource CardPanel}" Margin="0,12,0,0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <TextBlock Grid.Column="0"
-                           Text="{Binding StatusMessage}"
+        <!-- Нижняя панель с улучшенным оформлением -->
+        <Border Grid.Row="2" 
+                Background="{DynamicResource Primary700Brush}"
+                BorderBrush="{DynamicResource Primary500Brush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Margin="0,12,0,0">
+            <WrapPanel Margin="16">
+                <TextBlock Text="{Binding StatusMessage}"
                            VerticalAlignment="Center"
-                           Foreground="{StaticResource TextSecondaryBrush}"
-                           FontSize="{StaticResource FontSizeBody}" />
+                           Foreground="{DynamicResource TextLowEmphasisBrush}"
+                           FontSize="{DynamicResource FontSizeBody}"
+                           MinWidth="160"
+                           MaxWidth="560"
+                           TextWrapping="Wrap"
+                           Margin="0,6,16,6" />
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Content="Сброс к заводским"
                             Style="{StaticResource SecondaryButton}"
                             Command="{Binding ResetToDefaultsCommand}"
-                            Margin="0,0,8,0" />
+                            Margin="0,6,8,6"
+                            Padding="14,10" />
                     <Button Content="Применить (RAM)"
                             Style="{StaticResource ModernButton}"
                             Command="{Binding ApplyCommand}"
-                            Margin="0,0,8,0" />
+                            Margin="0,6,8,6"
+                            Padding="14,10" />
                     <Button Content="&#xE74E; Сохранить в NVS"
                             Style="{StaticResource SuccessButton}"
-                            Command="{Binding SaveToNvsCommand}" />
+                            Command="{Binding SaveToNvsCommand}"
+                            Padding="14,10"
+                            Margin="0,6,0,6" />
                 </StackPanel>
-            </Grid>
+            </WrapPanel>
         </Border>
     </Grid>
 </UserControl>

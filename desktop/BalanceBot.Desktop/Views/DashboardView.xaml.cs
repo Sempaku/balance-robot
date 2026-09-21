@@ -30,8 +30,9 @@ public partial class DashboardView : UserControl
 
     private void UpdateLayoutState()
     {
+        // Широкая раскладка требует: графики (MinWidth 400) + отступ 12 + панель 320 = 732
         double width = ActualWidth;
-        if (width < 900)
+        if (width < 740)
         {
             VisualStateManager.GoToState(this, "Narrow", true);
             _isSidebarVisible = false;

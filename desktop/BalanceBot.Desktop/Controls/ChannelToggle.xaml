@@ -4,13 +4,16 @@
              xmlns:local="clr-namespace:BalanceBot.Desktop.Controls">
 
     <CheckBox IsChecked="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=local:ChannelToggle}}"
-              Margin="0,0,0,8">
+              Margin="0,0,0,8"
+              Style="{StaticResource ModernCheckBox}">
         <StackPanel Orientation="Horizontal">
-            <Rectangle Width="10" Height="10"
+            <Rectangle Width="12" Height="12"
                        Fill="{Binding ChannelColor, RelativeSource={RelativeSource AncestorType=local:ChannelToggle}}"
-                       Margin="0,0,8,0" RadiusX="2" RadiusY="2" />
+                       Margin="0,0,10,0" RadiusX="3" RadiusY="3" />
             <TextBlock Text="{Binding Label, RelativeSource={RelativeSource AncestorType=local:ChannelToggle}}"
-                       FontSize="{StaticResource FontSizeBody}" />
+                       FontSize="{DynamicResource FontSizeBody}"
+                       Foreground="{DynamicResource TextMediumEmphasisBrush}"
+                       VerticalAlignment="Center" />
         </StackPanel>
     </CheckBox>
 </UserControl>

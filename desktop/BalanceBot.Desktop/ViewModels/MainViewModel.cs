@@ -27,6 +27,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private WifiViewModel? _wifi;
     [ObservableProperty] private BlackBoxViewModel? _blackBox;
     [ObservableProperty] private BodeViewModel? _bode;
+    [ObservableProperty] private string _currentTheme = "Dark";
 
     public bool CanConnect => !IsConnected && !IsConnecting;
     public bool CanEditInputs => !IsConnected && !IsConnecting;
@@ -55,6 +56,11 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 ManualIp = SelectedRobot.RemoteIpAddress;
             }
+        }
+        
+        if (e.PropertyName == nameof(CurrentTheme))
+        {
+            // Уведомляем UI о смене темы
         }
     }
 
@@ -220,5 +226,17 @@ public sealed partial class MainViewModel : ObservableObject
                 ConnectionStatus = $"Стоп выполнен (связь TCP: {ex.Message})";
             }
         }
+    }
+    
+    [RelayCommand]
+    public void ToggleTheme()
+    {
+        CurrentTheme = CurrentTheme == "Dark" ? "Light" : "Dark";
+        ApplyTheme();
+    }
+    
+    private void ApplyTheme()
+    {
+        // Тема применяется в code-behind MainWindow
     }
 }

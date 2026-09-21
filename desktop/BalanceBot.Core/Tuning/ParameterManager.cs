@@ -55,10 +55,13 @@ public sealed class ParameterManager
 
     /// <summary>
     /// Изменение параметра пользователем в UI (подвинул слайдер).
+    /// Эпсилон относительный: абсолютный 0.0001 глотал бы весь диапазон
+    /// малых параметров (kp/kv: 0–0.01).
     /// </summary>
     public void SetLocal(string key, float value)
     {
-        if (CurrentValues.TryGetValue(key, out float current) && Math.Abs(current - value) < 0.0001f)
+        if (CurrentValues.TryGetValue(key, out float current) &&
+            Math.Abs(current - value) <= Math.Max(1e-6f, Math.Abs(current) * 1e-4f))
         {
             ModifiedValues.Remove(key);
         }

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -47,6 +47,11 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
     // === Управление тримом на лету ===
     [ObservableProperty] private float _trimOffset;
 
+    // Автоприменение трима: после отпускания слайдера ждём 300 мс и шлём
+    // одно значение вместо TCP-потока на каждый пиксель перетаскивания
+    private const int TrimApplyDelayMs = 300;
+    private CancellationTokenSource? _trimApplyCts;
+
     // === Видимость каналов верхнего графика ===
     [ObservableProperty] private bool _showAngle = true;
 
@@ -65,7 +70,7 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
     // === Управление осциллографом ===
     [ObservableProperty] private bool _isPaused;
 
-    [ObservableProperty] private string _pauseButtonText = "⏸ Пауза";
+    [ObservableProperty] private string _pauseButtonText = " Пауза";
 
     // === Метрики и виджеты ===
     [ObservableProperty] private float _angle;
@@ -84,7 +89,7 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isArmed;
 
     [ObservableProperty] private bool _isRecording;
-    [ObservableProperty] private string _recordingButtonText = "⏺ Запись CSV";
+    [ObservableProperty] private string _recordingButtonText = " Запись CSV";
 
     public DashboardViewModel(TelemetryHub telemetryHub, ParameterManager paramManager)
     {
@@ -148,7 +153,7 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
                 break;
 
             case nameof(TrimOffset):
-                _ = ApplyTrimAsync();
+                ScheduleTrimApply();
                 break;
         }
 
@@ -176,10 +181,39 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
         TrimOffset = 0f;
     }
 
-    private async Task ApplyTrimAsync()
+    private void ScheduleTrimApply()
     {
+        _trimApplyCts?.Cancel();
+        _trimApplyCts = new CancellationTokenSource();
+        var token = _trimApplyCts.Token;
+        _ = ApplyTrimAsync(token);
+    }
+
+    private async Task ApplyTrimAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(TrimApplyDelayMs, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (token.IsCancellationRequested)
+        {
+            return;
+        }
+
         _paramManager.SetLocal("trim_offset", TrimOffset);
-        await _paramManager.ApplyModifiedAsync();
+        try
+        {
+            await _paramManager.ApplyModifiedAsync();
+        }
+        catch
+        {
+            // связь могла оборваться — трим уйдёт при следующем изменении
+        }
     }
 
     private void OnRenderTick(object? sender, EventArgs e)
@@ -205,8 +239,8 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
 
         IsRecording = _telemetryHub.Recorder.IsRecording;
         RecordingButtonText = IsRecording
-            ? $"⏹ Стоп ({_telemetryHub.Recorder.RecordsWritten})"
-            : "⏺ Запись CSV";
+            ? $" Стоп ({_telemetryHub.Recorder.RecordsWritten})"
+            : " Запись CSV";
 
         if (IsPaused) return;
 
@@ -228,7 +262,7 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
     private void TogglePause()
     {
         IsPaused = !IsPaused;
-        PauseButtonText = IsPaused ? "▶ Продолжить" : "⏸ Пауза";
+        PauseButtonText = IsPaused ? " Продолжить" : " Пауза";
     }
 
     [RelayCommand]
@@ -247,7 +281,7 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
 
             await _telemetryHub.Recorder.StopAsync();
             IsRecording = false;
-            RecordingButtonText = "⏺ Запись CSV";
+            RecordingButtonText = " Запись CSV";
 
             MessageBox.Show(
                 $"Запись сессии успешно завершена!\n\nФайл: {savedPath}\nЗаписано строк: {count}",
@@ -259,7 +293,7 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
         {
             _telemetryHub.Recorder.Start();
             IsRecording = true;
-            RecordingButtonText = "⏹ Стоп (0)";
+            RecordingButtonText = " Стоп (0)";
         }
     }
 

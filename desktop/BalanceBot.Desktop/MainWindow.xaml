@@ -1,149 +1,270 @@
-﻿<Window x:Class="BalanceBot.Desktop.MainWindow"
+<Window x:Class="BalanceBot.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:BalanceBot.Desktop"
         xmlns:views="clr-namespace:BalanceBot.Desktop.Views"
-        Title="BalanceBot Studio — Монитор и Тюнинг"
+        Title="BalanceBot Studio"
         MinHeight="600" MinWidth="900"
         Height="850" Width="1400"
-        Background="{StaticResource BgDarkBrush}"
+        Background="{DynamicResource BgDarkBrush}"
         WindowStartupLocation="CenterScreen">
 
     <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <!-- Верхняя панель статуса -->
-        <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,16" Padding="12,14">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <!-- Логотип + статус -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="&#xE99A; BALANCE-BOT"
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        
+        <!-- Боковая панель навигации -->
+        <Border Grid.Column="0" 
+                Background="{DynamicResource Primary700Brush}" 
+                CornerRadius="10"
+                Margin="0,0,16,0"
+                Padding="0,10">
+            <StackPanel>
+                <!-- Логотип -->
+                <StackPanel Orientation="Horizontal" 
+                            Margin="16,0,16,20" 
+                            HorizontalAlignment="Left">
+                    <TextBlock Text="&#xE99A;" 
                                FontFamily="Segoe Fluent Icons, Segoe UI"
-                               FontSize="18"
+                               FontSize="24"
+                               Foreground="{DynamicResource Accent500Brush}"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="BALANCE-BOT" 
+                               FontSize="{DynamicResource FontSizeTitle}"
                                FontWeight="Bold"
-                               Foreground="{StaticResource AccentBrush}"
+                               Foreground="{DynamicResource TextHighEmphasisBrush}"
                                VerticalAlignment="Center"
-                               Margin="0,0,16,0" />
-                    <Border Background="{StaticResource BgDarkBrush}"
-                            CornerRadius="6"
-                            Padding="10,6"
-                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                            MaxWidth="340">
-                        <TextBlock Text="{Binding ConnectionStatus}"
-                                   FontSize="{StaticResource FontSizeCaption}"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   TextTrimming="CharacterEllipsis"
-                                   ToolTip="{Binding ConnectionStatus}" />
-                    </Border>
+                               Margin="10,0,0,0" />
                 </StackPanel>
-
-                <!-- Подключение -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Button Content="&#xE721; Поиск"
-                            Style="{StaticResource SecondaryButton}"
-                            Command="{Binding ScanNetworkCommand}"
-                            IsEnabled="{Binding CanEditInputs}"
-                            Margin="0,0,8,0" />
-                    <ComboBox ItemsSource="{Binding DiscoveredRobots}"
-                              SelectedItem="{Binding SelectedRobot}"
-                              DisplayMemberPath="DisplayName"
-                              Width="210" MinWidth="150"
-                              IsEnabled="{Binding CanEditInputs}"
-                              Margin="0,0,8,0"
-                              VerticalContentAlignment="Center" />
-                    <TextBox Text="{Binding ManualIp}"
-                             Style="{StaticResource ModernTextBox}"
-                             Width="130" MinWidth="110"
-                             IsEnabled="{Binding CanEditInputs}"
-                             Margin="0,0,8,0"
-                             VerticalContentAlignment="Center" />
-
-                    <Button Content="Подключить"
-                            Style="{StaticResource ModernButton}"
-                            Command="{Binding ConnectCommand}"
-                            Visibility="{Binding CanConnect, Converter={StaticResource BoolToVis}}"
-                            Margin="0,0,6,0" />
-                    <Button Content="Отмена"
-                            Style="{StaticResource DangerButton}"
-                            Command="{Binding CancelConnectCommand}"
-                            Visibility="{Binding IsConnecting, Converter={StaticResource BoolToVis}}"
-                            Margin="0,0,6,0" Padding="14,8" />
-                    <Button Content="Отключить"
-                            Style="{StaticResource SecondaryButton}"
-                            Command="{Binding DisconnectCommand}"
-                            Visibility="{Binding IsConnected, Converter={StaticResource BoolToVis}}" />
-                </StackPanel>
-
-                <!-- Запись CSV -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                    <Button Content="{Binding Dashboard.RecordingButtonText, FallbackValue='&#xE7C8; Запись CSV'}"
-                            Command="{Binding Dashboard.ToggleRecordingCommand}"
-                            IsEnabled="{Binding IsConnected}"
-                            Margin="0,0,6,0">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Dashboard.IsRecording}" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource DangerBrush}" />
-                                        <Setter Property="Foreground" Value="White" />
-                                        <Setter Property="FontWeight" Value="Bold" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                    <Button Content="&#xE8B7; Логи"
-                            Style="{StaticResource SecondaryButton}"
-                            Command="{Binding Dashboard.OpenLogsFolderCommand}"
-                            ToolTip="Открыть папку с логами" />
-                </StackPanel>
-
-                <!-- Арм / Дизарм -->
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="ВКЛЮЧИТЬ БАЛАНС"
-                            Style="{StaticResource SuccessButton}"
-                            Command="{Binding ArmRobotCommand}"
-                            IsEnabled="{Binding IsConnected}"
-                            Margin="0,0,8,0" Padding="20,10" />
-                    <Button Content="СТОП (ПРОБЕЛ)"
-                            Style="{StaticResource DangerButton}"
-                            Command="{Binding DisarmRobotCommand}"
-                            IsEnabled="{Binding IsConnected}"
-                            Padding="20,10" />
-                </StackPanel>
-            </Grid>
+                
+                <!-- Элементы навигации -->
+                <RadioButton x:Name="DashboardNav"
+                             GroupName="Navigation"
+                             Style="{StaticResource NavRadioButton}"
+                             Tag="Dashboard"
+                             IsChecked="True">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE9D2;" 
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="Осциллограф" 
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+                
+                <RadioButton x:Name="TuningNav"
+                             GroupName="Navigation"
+                             Style="{StaticResource NavRadioButton}"
+                             Tag="Tuning">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE713;" 
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="Тюнинг PID" 
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+                
+                <RadioButton x:Name="ControlNav"
+                             GroupName="Navigation"
+                             Style="{StaticResource NavRadioButton}"
+                             Tag="Control">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE7FC;" 
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="Управление" 
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+                
+                <RadioButton x:Name="WifiNav"
+                             GroupName="Navigation"
+                             Style="{StaticResource NavRadioButton}"
+                             Tag="Wifi">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE701;" 
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="Wi-Fi сети" 
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+                
+                <RadioButton x:Name="BlackBoxNav"
+                             GroupName="Navigation"
+                             Style="{StaticResource NavRadioButton}"
+                             Tag="BlackBox">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE7B8;" 
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="Чёрный ящик" 
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+                
+                <RadioButton x:Name="BodeNav"
+                             GroupName="Navigation"
+                             Style="{StaticResource NavRadioButton}"
+                             Tag="Bode">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE9D2;" 
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="Устойчивость" 
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+            </StackPanel>
         </Border>
 
-        <!-- Вкладки -->
-        <TabControl Grid.Row="1">
-            <TabItem Header="&#xE9D2; Осциллограф">
-                <views:DashboardView DataContext="{Binding Dashboard}" />
-            </TabItem>
-            <TabItem Header="&#xE713; Тюнинг PID">
-                <views:TuningView DataContext="{Binding Tuning}" />
-            </TabItem>
-            <TabItem Header="&#xE7FC; Управление">
-                <views:ControlView DataContext="{Binding Control}" />
-            </TabItem>
-            <TabItem Header="&#xE701; Wi-Fi сети">
-                <views:WifiView DataContext="{Binding Wifi}" />
-            </TabItem>
-            <TabItem Header="&#xE7B8; Чёрный ящик">
-                <views:BlackBoxView DataContext="{Binding BlackBox}" />
-            </TabItem>
-            <TabItem Header="&#xE9D2; Устойчивость">
-                <views:BodeView DataContext="{Binding Bode}" />
-            </TabItem>
-        </TabControl>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Верхняя панель статуса: две строки с переносом, чтобы группы
+                 не накладывались при узком окне -->
+            <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,16" Padding="12,12">
+                <StackPanel>
+                    <WrapPanel>
+                        <!-- Статус -->
+                        <Border Background="{DynamicResource BgDarkBrush}"
+                                CornerRadius="6"
+                                Padding="10,6"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                MinWidth="220" MaxWidth="420"
+                                Margin="0,0,16,0"
+                                VerticalAlignment="Center">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding ConnectionStatus}"
+                                           FontSize="{DynamicResource FontSizeCaption}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding ConnectionStatus}"
+                                           VerticalAlignment="Center" />
+                                <Button Grid.Column="1"
+                                        Content="&#xE793;"
+                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Command="{Binding ToggleThemeCommand}"
+                                        Width="24" Height="24"
+                                        Padding="0"
+                                        Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Подключение -->
+                        <WrapPanel VerticalAlignment="Center">
+                            <Button Content="&#xE721; Поиск"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding ScanNetworkCommand}"
+                                    IsEnabled="{Binding CanEditInputs}"
+                                    Margin="0,4,8,4" />
+                            <ComboBox ItemsSource="{Binding DiscoveredRobots}"
+                                      SelectedItem="{Binding SelectedRobot}"
+                                      DisplayMemberPath="DisplayName"
+                                      Width="180" MinWidth="140"
+                                      IsEnabled="{Binding CanEditInputs}"
+                                      Margin="0,4,8,4"
+                                      VerticalAlignment="Center"
+                                      VerticalContentAlignment="Center" />
+                            <TextBox Text="{Binding ManualIp}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Width="120" MinWidth="100"
+                                     IsEnabled="{Binding CanEditInputs}"
+                                     Margin="0,4,8,4"
+                                     VerticalAlignment="Center"
+                                     VerticalContentAlignment="Center" />
+
+                            <Button Content="Подключить"
+                                    Style="{StaticResource ModernButton}"
+                                    Command="{Binding ConnectCommand}"
+                                    Visibility="{Binding CanConnect, Converter={StaticResource BoolToVis}}"
+                                    Margin="0,4,6,4" />
+                            <Button Content="Отмена"
+                                    Style="{StaticResource DangerButton}"
+                                    Command="{Binding CancelConnectCommand}"
+                                    Visibility="{Binding IsConnecting, Converter={StaticResource BoolToVis}}"
+                                    Margin="0,4,6,4" Padding="14,8" />
+                            <Button Content="Отключить"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding DisconnectCommand}"
+                                    Visibility="{Binding IsConnected, Converter={StaticResource BoolToVis}}"
+                                    Margin="0,4,0,4" />
+                        </WrapPanel>
+                    </WrapPanel>
+
+                    <WrapPanel Margin="0,10,0,0" HorizontalAlignment="Right">
+                        <!-- Запись CSV -->
+                        <Button Content="{Binding Dashboard.RecordingButtonText, FallbackValue='&#xE7C8; Запись CSV'}"
+                                Command="{Binding Dashboard.ToggleRecordingCommand}"
+                                IsEnabled="{Binding IsConnected}"
+                                Margin="0,4,6,4">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Dashboard.IsRecording}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource DangerBrush}" />
+                                            <Setter Property="Foreground" Value="White" />
+                                            <Setter Property="FontWeight" Value="Bold" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <Button Content="&#xE8B7; Логи"
+                                Style="{StaticResource SecondaryButton}"
+                                Command="{Binding Dashboard.OpenLogsFolderCommand}"
+                                ToolTip="Открыть папку с логами"
+                                Margin="0,4,16,4" />
+
+                        <!-- Арм / Дизарм -->
+                        <Button Content="ВКЛЮЧИТЬ БАЛАНС"
+                                Style="{StaticResource SuccessButton}"
+                                Command="{Binding ArmRobotCommand}"
+                                IsEnabled="{Binding IsConnected}"
+                                Margin="0,4,8,4" Padding="20,10" />
+                        <Button Content="СТОП (ПРОБЕЛ)"
+                                Style="{StaticResource DangerButton}"
+                                Command="{Binding DisarmRobotCommand}"
+                                IsEnabled="{Binding IsConnected}"
+                                Padding="20,10"
+                                Margin="0,4,0,4" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Контент -->
+            <Grid Grid.Row="1">
+                <views:DashboardView x:Name="DashboardView" DataContext="{Binding Dashboard}" />
+                <views:TuningView x:Name="TuningView" DataContext="{Binding Tuning}" Visibility="Collapsed" />
+                <views:ControlView x:Name="ControlView" DataContext="{Binding Control}" Visibility="Collapsed" />
+                <views:WifiView x:Name="WifiView" DataContext="{Binding Wifi}" Visibility="Collapsed" />
+                <views:BlackBoxView x:Name="BlackBoxView" DataContext="{Binding BlackBox}" Visibility="Collapsed" />
+                <views:BodeView x:Name="BodeView" DataContext="{Binding Bode}" Visibility="Collapsed" />
+            </Grid>
+        </Grid>
     </Grid>
 </Window>

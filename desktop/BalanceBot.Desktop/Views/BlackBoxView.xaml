@@ -9,9 +9,14 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Панель управления -->
-        <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,12">
-            <Grid>
+        <!-- Панель управления с улучшенным оформлением -->
+        <Border Grid.Row="0" 
+                Background="{DynamicResource Primary700Brush}"
+                BorderBrush="{DynamicResource Primary500Brush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Margin="0,0,0,14">
+            <Grid Margin="16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -19,30 +24,45 @@
 
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding StatusMessage}"
-                               FontSize="{StaticResource FontSizeBody}"
+                               FontSize="{DynamicResource FontSizeBody}"
                                FontWeight="SemiBold"
-                               Foreground="{StaticResource AccentBrush}" />
+                               Foreground="{DynamicResource Accent500Brush}" />
                     <TextBlock Text="Запись последних 2 секунд на частоте 200 Гц до удара о пол"
-                               FontSize="{StaticResource FontSizeCaption}"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               Margin="0,2,0,0" />
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               Foreground="{DynamicResource TextLowEmphasisBrush}"
+                               Margin="0,4,0,0" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button Content="&#xE74C; Очистить ящик"
                             Style="{StaticResource SecondaryButton}"
                             Command="{Binding ClearBlackBoxCommand}"
-                            Margin="0,0,8,0" />
+                            Margin="0,0,10,0" 
+                            Padding="14,10" />
                     <Button Content="&#xE896; Выгрузить и разобрать аварию"
                             Style="{StaticResource ModernButton}"
-                            Command="{Binding LoadBlackBoxCommand}" />
+                            Command="{Binding LoadBlackBoxCommand}" 
+                            Padding="14,10" />
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- График -->
-        <Border Grid.Row="1" Style="{StaticResource CardPanel}" Padding="4">
-            <ScottPlot:WpfPlot x:Name="PlotBlackBox" />
+        <!-- График с улучшенным оформлением -->
+        <Border Grid.Row="1" 
+                Background="{DynamicResource Primary700Brush}"
+                BorderBrush="{DynamicResource Primary500Brush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="6">
+            <Grid>
+                <ScottPlot:WpfPlot x:Name="PlotBlackBox" />
+                <TextBlock Text="Чёрный ящик падений"
+                           FontSize="{DynamicResource FontSizeCaption}"
+                           Foreground="{DynamicResource TextMediumEmphasisBrush}"
+                           HorizontalAlignment="Left" 
+                           VerticalAlignment="Top"
+                           Margin="10,6,0,0" />
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

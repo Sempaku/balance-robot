@@ -114,7 +114,6 @@ public sealed class DualSenseInput : IDisposable
     private byte _ledR;
     private byte _ledG;
     private byte _ledB;
-    private bool _ledResetDone;
     private DateTime _ledReadyAt;
 
     private volatile string? _manualPath;
@@ -432,7 +431,6 @@ public sealed class DualSenseInput : IDisposable
         }
 
         _prevButtons = DualSenseButtons.None;
-        _ledResetDone = false;
 
         // На BT анимация подключения занимает ~3.4 с: lightbar раньше времени
         // не принимает цвет (SDL ждёт метку времени сенсоров 10.2M × 0.33 мкс)

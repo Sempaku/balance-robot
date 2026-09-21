@@ -47,47 +47,69 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Метрики: адаптивная сетка -->
-        <WrapPanel Grid.Row="0" Margin="0,0,0,12">
-            <ctrl:MetricCard Title="Состояние"
-                             ValueContent="{Binding StateText}"
-                             ValueForeground="{StaticResource AccentBrush}"
-                             MinWidth="140" Margin="0,0,6,6" />
-            <ctrl:MetricCard Title="Угол наклона"
-                             ValueContent="{Binding Angle, StringFormat={}{0:F2}°}"
-                             MinWidth="140" Margin="0,0,6,6" />
-            <ctrl:MetricCard Title="Гироскоп"
-                             ValueContent="{Binding Gyro, StringFormat={}{0:F1}°/с}"
-                             MinWidth="140" Margin="0,0,6,6" />
-            <ctrl:MetricCard Title="Тяга привода"
-                             ValueContent="{Binding CmdRps, StringFormat={}{0:F2} об/с}"
-                             ValueForeground="{StaticResource WarningBrush}"
-                             MinWidth="140" Margin="0,0,6,6" />
-            <ctrl:MetricCard Title="Скорость колес"
-                             ValueContent="{Binding WheelRateRps, StringFormat={}{0:F2} об/с}"
-                             MinWidth="140" Margin="0,0,6,6" />
-            <ctrl:MetricCard Title="Наклон хода (Lean)"
-                             ValueContent="{Binding Lean, StringFormat={}{0:+0.00;-0.00;0.00}°}"
-                             ValueForeground="{StaticResource WarningBrush}"
-                             MinWidth="140" Margin="0,0,6,6" />
-            <ctrl:MetricCard Title="Трим (равновесие)"
-                             ValueContent="{Binding Trim, StringFormat={}{0:+0.00;-0.00;0.00}°}"
-                             ValueForeground="{StaticResource SuccessBrush}"
-                             MinWidth="140" Margin="0,0,6,6" />
-            <ctrl:MetricCard Title="Цикл / Ошибки IMU"
-                             ValueContent="{Binding DtUs, StringFormat={}{0} мкс}"
-                             ValueForeground="{StaticResource SuccessBrush}"
-                             MinWidth="140" Margin="0,0,0,6" />
-        </WrapPanel>
+        <!-- Улучшенные метрики: адаптивная сетка -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            
+            <!-- Основные метрики -->
+            <WrapPanel Grid.Row="0" Margin="0,0,0,6">
+                <ctrl:MetricCard Title="Состояние"
+                                 ValueContent="{Binding StateText}"
+                                 ValueForeground="{DynamicResource Accent500Brush}"
+                                 MinWidth="140" Margin="0,0,6,6" />
+                <ctrl:MetricCard Title="Угол наклона"
+                                 ValueContent="{Binding Angle, StringFormat={}{0:F2}°}"
+                                 MinWidth="140" Margin="0,0,6,6" />
+                <ctrl:MetricCard Title="Гироскоп"
+                                 ValueContent="{Binding Gyro, StringFormat={}{0:F1}°/с}"
+                                 MinWidth="140" Margin="0,0,6,6" />
+                <ctrl:MetricCard Title="Тяга привода"
+                                 ValueContent="{Binding CmdRps, StringFormat={}{0:F2} об/с}"
+                                 ValueForeground="{DynamicResource Warning500Brush}"
+                                 MinWidth="140" Margin="0,0,6,6" />
+                <ctrl:MetricCard Title="Скорость колес"
+                                 ValueContent="{Binding WheelRateRps, StringFormat={}{0:F2} об/с}"
+                                 MinWidth="140" Margin="0,0,0,6" />
+            </WrapPanel>
+            
+            <!-- Дополнительные метрики -->
+            <WrapPanel Grid.Row="1">
+                <ctrl:MetricCard Title="Наклон хода"
+                                 ValueContent="{Binding Lean, StringFormat={}{0:+0.00;-0.00;0.00}°}"
+                                 ValueForeground="{DynamicResource Warning500Brush}"
+                                 MinWidth="140" Margin="0,0,6,6" />
+                <ctrl:MetricCard Title="Трим"
+                                 ValueContent="{Binding Trim, StringFormat={}{0:+0.00;-0.00;0.00}°}"
+                                 ValueForeground="{DynamicResource Success500Brush}"
+                                 MinWidth="140" Margin="0,0,6,6" />
+                <ctrl:MetricCard Title="Цикл"
+                                 ValueContent="{Binding DtUs, StringFormat={}{0} мкс}"
+                                 ValueForeground="{DynamicResource Success500Brush}"
+                                 MinWidth="140" Margin="0,0,6,6" />
+                <ctrl:MetricCard Title="Ошибки IMU"
+                                 ValueContent="{Binding ImuErrors}"
+                                 ValueForeground="{DynamicResource Danger500Brush}"
+                                 MinWidth="140" Margin="0,0,6,6" />
+                <ctrl:MetricCard Title="RSSI Wi-Fi"
+                                 ValueContent="{Binding WifiRssi, StringFormat={}{0} dBm}"
+                                 MinWidth="140" Margin="0,0,6,6" />
+                <ctrl:MetricCard Title="Uptime"
+                                 ValueContent="{Binding UptimeSec, StringFormat={}{0} с}"
+                                 MinWidth="140" Margin="0,0,0,6" />
+            </WrapPanel>
+        </Grid>
 
-        <!-- Графики + боковая панель -->
+        <!-- Улучшенные графики + боковая панель -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" MinWidth="400" />
-                <ColumnDefinition x:Name="SidebarColumn" Width="300" />
+                <ColumnDefinition x:Name="SidebarColumn" Width="320" />
             </Grid.ColumnDefinitions>
 
-            <!-- Графики -->
+            <!-- Графики с улучшенным оформлением -->
             <Grid Grid.Column="0" Margin="0,0,12,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" MinHeight="200" />
@@ -97,7 +119,7 @@
                 <!-- Кнопка показа боковой панели на узких экранах -->
                 <Button x:Name="ToggleSidebarButton"
                         Content="&#xE700;"
-                        FontFamily="Segoe Fluent Icons"
+                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                         Style="{StaticResource SecondaryButton}"
                         Width="36" Height="36"
                         HorizontalAlignment="Right" VerticalAlignment="Top"
@@ -106,87 +128,141 @@
                         Click="ToggleSidebar_Click"
                         Panel.ZIndex="10" />
 
-                <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,8" Padding="4">
-                    <ScottPlot:WpfPlot x:Name="PlotOrientation" />
+                <Border Grid.Row="0" 
+                        Background="{DynamicResource Primary700Brush}"
+                        BorderBrush="{DynamicResource Primary500Brush}" 
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Margin="0,0,0,8" 
+                        Padding="6">
+                    <Grid>
+                        <ScottPlot:WpfPlot x:Name="PlotOrientation" />
+                        <TextBlock Text="Ориентация и IMU (Градусы °)"
+                                   FontSize="{DynamicResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextMediumEmphasisBrush}"
+                                   HorizontalAlignment="Left" 
+                                   VerticalAlignment="Top"
+                                   Margin="10,6,0,0" />
+                    </Grid>
                 </Border>
 
-                <Border Grid.Row="1" Style="{StaticResource CardPanel}" Margin="0,8,0,0" Padding="4">
-                    <ScottPlot:WpfPlot x:Name="PlotMotors" />
+                <Border Grid.Row="1" 
+                        Background="{DynamicResource Primary700Brush}"
+                        BorderBrush="{DynamicResource Primary500Brush}" 
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Margin="0,8,0,0" 
+                        Padding="6">
+                    <Grid>
+                        <ScottPlot:WpfPlot x:Name="PlotMotors" />
+                        <TextBlock Text="Привод колес и регулятор (об/с)"
+                                   FontSize="{DynamicResource FontSizeCaption}"
+                                   Foreground="{DynamicResource TextMediumEmphasisBrush}"
+                                   HorizontalAlignment="Left" 
+                                   VerticalAlignment="Top"
+                                   Margin="10,6,0,0" />
+                    </Grid>
                 </Border>
             </Grid>
 
-            <!-- Боковая панель -->
+            <!-- Улучшенная боковая панель -->
             <Border x:Name="SidebarBorder"
                     Grid.Column="1"
-                    Style="{StaticResource CardPanel}"
-                    MinWidth="280">
+                    Background="{DynamicResource Primary700Brush}"
+                    BorderBrush="{DynamicResource Primary500Brush}" 
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    MinWidth="300">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
+                    <StackPanel Margin="12">
                         <!-- Кнопка скрытия панели -->
                         <Button Content="&#xE711;"
-                                FontFamily="Segoe Fluent Icons"
+                                FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                                 Style="{StaticResource SecondaryButton}"
                                 Width="32" Height="32"
                                 HorizontalAlignment="Right"
-                                Margin="0,0,0,8"
+                                Margin="0,0,0,12"
                                 Click="ToggleSidebar_Click" />
 
-                        <!-- Трим -->
+                        <!-- Трим с улучшенным оформлением -->
                         <TextBlock Text="Точка равновесия (Трим)"
-                                   FontSize="{StaticResource FontSizeTitle}"
+                                   FontSize="{DynamicResource FontSizeTitle}"
                                    FontWeight="Bold"
-                                   Foreground="{StaticResource AccentBrush}"
-                                   Margin="0,0,0,6" />
-                        <Border Background="{StaticResource BgDarkBrush}"
-                                CornerRadius="6"
-                                Padding="10" Margin="0,0,0,14"
-                                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                   Foreground="{DynamicResource Accent500Brush}"
+                                   Margin="0,0,0,12" />
+                        
+                        <Border Background="{DynamicResource Primary600Brush}"
+                                CornerRadius="8"
+                                Padding="12" Margin="0,0,0,16"
+                                BorderBrush="{DynamicResource Primary500Brush}" BorderThickness="1">
                             <StackPanel>
-                                <Grid Margin="0,0,0,6">
+                                <Grid Margin="0,0,0,10">
                                     <TextBlock Text="Смещение угла:"
-                                               FontSize="{StaticResource FontSizeCaption}"
-                                               Foreground="{StaticResource TextSecondaryBrush}" />
+                                               FontSize="{DynamicResource FontSizeBody}"
+                                               Foreground="{DynamicResource TextMediumEmphasisBrush}" />
                                     <TextBlock Text="{Binding TrimOffset, StringFormat={}{0:+0.00;-0.00;0.00}°}"
                                                HorizontalAlignment="Right"
-                                               FontSize="{StaticResource FontSizeBody}"
+                                               FontSize="{DynamicResource FontSizeTitle}"
                                                FontWeight="Bold"
-                                               Foreground="{StaticResource SuccessBrush}" />
+                                               Foreground="{DynamicResource Success500Brush}" />
                                 </Grid>
 
-                                <Slider Minimum="-5.0" Maximum="5.0"
+                                <Slider Minimum="-8.0" Maximum="8.0"
                                         Value="{Binding TrimOffset}"
                                         SmallChange="0.05" LargeChange="0.2"
+                                        IsMoveToPointEnabled="True"
                                         TickFrequency="0.5"
                                         IsSnapToTickEnabled="False"
-                                        Margin="0,2,0,8" />
+                                        Margin="0,4,0,12" 
+                                        Style="{StaticResource ModernSlider}" />
 
-                                <UniformGrid Columns="5" Margin="0,2,0,0">
-                                    <Button Content="-0.2°" Style="{StaticResource SecondaryButton}"
-                                            Padding="4,4" FontSize="11"
-                                            Command="{Binding AdjustTrimCommand}" CommandParameter="-0.2" Margin="1" />
-                                    <Button Content="-0.05°" Style="{StaticResource SecondaryButton}"
-                                            Padding="2,4" FontSize="10"
-                                            Command="{Binding AdjustTrimCommand}" CommandParameter="-0.05" Margin="1" />
-                                    <Button Content="0.0°" Style="{StaticResource SecondaryButton}"
-                                            Padding="4,4" FontSize="11"
-                                            Command="{Binding ResetTrimCommand}" Margin="1" />
-                                    <Button Content="+0.05°" Style="{StaticResource SecondaryButton}"
-                                            Padding="2,4" FontSize="10"
-                                            Command="{Binding AdjustTrimCommand}" CommandParameter="0.05" Margin="1" />
-                                    <Button Content="+0.2°" Style="{StaticResource SecondaryButton}"
-                                            Padding="4,4" FontSize="11"
-                                            Command="{Binding AdjustTrimCommand}" CommandParameter="0.2" Margin="1" />
+                                <UniformGrid Columns="5" Margin="0,4,0,0">
+                                    <Button Content="-0.2°" 
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="4,6" 
+                                            FontSize="{DynamicResource FontSizeCaption}"
+                                            Command="{Binding AdjustTrimCommand}" 
+                                            CommandParameter="-0.2" 
+                                            Margin="2" />
+                                    <Button Content="-0.05°" 
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="2,6" 
+                                            FontSize="10"
+                                            Command="{Binding AdjustTrimCommand}" 
+                                            CommandParameter="-0.05" 
+                                            Margin="2" />
+                                    <Button Content="0.0°" 
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="4,6" 
+                                            FontSize="{DynamicResource FontSizeCaption}"
+                                            Command="{Binding ResetTrimCommand}" 
+                                            Margin="2" />
+                                    <Button Content="+0.05°" 
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="2,6" 
+                                            FontSize="10"
+                                            Command="{Binding AdjustTrimCommand}" 
+                                            CommandParameter="0.05" 
+                                            Margin="2" />
+                                    <Button Content="+0.2°" 
+                                            Style="{StaticResource SecondaryButton}"
+                                            Padding="4,6" 
+                                            FontSize="{DynamicResource FontSizeCaption}"
+                                            Command="{Binding AdjustTrimCommand}" 
+                                            CommandParameter="0.2" 
+                                            Margin="2" />
                                 </UniformGrid>
+                                
                                 <TextBlock Text="Подстройка: клавиши [ и ]"
                                            FontSize="10"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextLowEmphasisBrush}"
                                            HorizontalAlignment="Center"
-                                           Margin="0,6,0,0" />
+                                           Margin="0,10,0,0" />
                             </StackPanel>
                         </Border>
 
                         <!-- Управление графиком -->
-                        <Grid Margin="0,0,0,14">
+                        <Grid Margin="0,0,0,16">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
@@ -195,60 +271,71 @@
                                     Content="{Binding PauseButtonText}"
                                     Style="{StaticResource SecondaryButton}"
                                     Command="{Binding TogglePauseCommand}"
-                                    Margin="0,0,4,0" />
+                                    Margin="0,0,4,0" 
+                                    Padding="12,8" />
                             <Button Grid.Column="1"
                                     Content="&#xE72C; Масштаб"
                                     Style="{StaticResource SecondaryButton}"
                                     Command="{Binding ResetAxesCommand}"
-                                    Margin="4,0,0,0" />
+                                    Margin="4,0,0,0" 
+                                    Padding="12,8" />
                         </Grid>
 
-                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Margin="0,0,0,12" />
+                        <Border BorderBrush="{DynamicResource Primary500Brush}" BorderThickness="0,0,0,1" Margin="0,0,0,14" />
 
                         <!-- Каналы ориентации -->
                         <TextBlock Text="Ориентация и датчики"
-                                   FontSize="{StaticResource FontSizeCaption}"
+                                   FontSize="{DynamicResource FontSizeBody}"
                                    FontWeight="Bold"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   Margin="0,0,0,8" />
+                                   Foreground="{DynamicResource TextMediumEmphasisBrush}"
+                                   Margin="0,0,0,12" />
 
                         <ctrl:ChannelToggle IsChecked="{Binding ShowAngle}"
                                             Label="Угол фильтра (°)"
-                                            ChannelColor="#3D7EFF" />
+                                            ChannelColor="{DynamicResource Accent500Brush}" 
+                                            Margin="0,0,0,6"/>
                         <ctrl:ChannelToggle IsChecked="{Binding ShowGyro}"
                                             Label="Гироскоп (°/с)"
-                                            ChannelColor="#00E676" />
+                                            ChannelColor="{DynamicResource Success500Brush}" 
+                                            Margin="0,0,0,6"/>
                         <ctrl:ChannelToggle IsChecked="{Binding ShowTrim}"
                                             Label="Точка баланса Trim (°)"
-                                            ChannelColor="#E8EAF0" />
+                                            ChannelColor="{DynamicResource TextHighEmphasisBrush}" 
+                                            Margin="0,0,0,6"/>
                         <ctrl:ChannelToggle IsChecked="{Binding ShowAccelAngle}"
                                             Label="Сырой акселерометр (°)"
-                                            ChannelColor="#80D8FF" />
+                                            ChannelColor="{DynamicResource Accent300Brush}" 
+                                            Margin="0,0,0,6"/>
                         <ctrl:ChannelToggle IsChecked="{Binding ShowLean}"
                                             Label="Целевой наклон Lean (°)"
-                                            ChannelColor="#FF6D00" />
+                                            ChannelColor="{DynamicResource Warning500Brush}" 
+                                            Margin="0,0,0,16"/>
 
-                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Margin="0,0,0,12" />
+                        <Border BorderBrush="{DynamicResource Primary500Brush}" BorderThickness="0,0,0,1" Margin="0,0,0,14" />
 
                         <!-- Каналы моторов -->
                         <TextBlock Text="Моторы и контур (об/с)"
-                                   FontSize="{StaticResource FontSizeCaption}"
+                                   FontSize="{DynamicResource FontSizeBody}"
                                    FontWeight="Bold"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   Margin="0,0,0,8" />
+                                   Foreground="{DynamicResource TextMediumEmphasisBrush}"
+                                   Margin="0,0,0,12" />
 
                         <ctrl:ChannelToggle IsChecked="{Binding ShowCmd}"
                                             Label="Команда привода (об/с)"
-                                            ChannelColor="#FFB300" />
+                                            ChannelColor="{DynamicResource Warning500Brush}" 
+                                            Margin="0,0,0,6"/>
                         <ctrl:ChannelToggle IsChecked="{Binding ShowWheelRate}"
                                             Label="Скорость колес (об/с)"
-                                            ChannelColor="#B388FF" />
+                                            ChannelColor="{DynamicResource Accent300Brush}" 
+                                            Margin="0,0,0,6"/>
                         <ctrl:ChannelToggle IsChecked="{Binding ShowTermP}"
                                             Label="Вклад P-члена"
-                                            ChannelColor="#FF4081" />
+                                            ChannelColor="{DynamicResource Danger500Brush}" 
+                                            Margin="0,0,0,6"/>
                         <ctrl:ChannelToggle IsChecked="{Binding ShowTermD}"
                                             Label="Вклад D-члена"
-                                            ChannelColor="#78909C" />
+                                            ChannelColor="{DynamicResource TextLowEmphasisBrush}" 
+                                            Margin="0,0,0,6"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
